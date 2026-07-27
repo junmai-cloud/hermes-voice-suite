@@ -46,6 +46,7 @@ voice-suite demo
 - [x] Deterministic local demo and tests
 - [ ] Google Calendar adapter using the existing Hermes token
 - [ ] Japanese STT/TTS adapter
-- [ ] Discord voice receive/playback bridge with barge-in
+- [x] Discord voice receive/playback bridge prototype (`/join`, `/record`, `/stop`, `/leave`)
+- [ ] Low-latency VAD and barge-in
 - [ ] Morning/evening scheduler and 24-hour audio cleanup
 - [ ] VPS deployment and health checks
