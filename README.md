@@ -59,6 +59,7 @@ The preflight check never prints tokens or API keys.
 - [x] Pycord streaming sink for automatic turn boundaries
 - [x] Voice playback with speech interruption (`/listen`, `/stop_listen`)
 - [x] Privacy-safe metrics report (`/stats`, no transcript/audio content)
+- [x] Connection/listening status command (`/health`)
 - [x] Opus-compressed STT uploads and explicit mobile-data budget
 - [x] Privacy-preserving session metrics (bytes, latency counters, no transcript storage)
 - [x] Safe offline preflight check (`voice-bot --check`)

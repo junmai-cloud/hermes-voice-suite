@@ -146,6 +146,19 @@ class VoiceBridge:
         async def stats(ctx: discord.ApplicationContext):
             await ctx.respond(self.metrics.report(), ephemeral=True)
 
+        @self.bot.slash_command(description="Show connection and listening status")
+        async def health(ctx: discord.ApplicationContext):
+            client = self.voice_client
+            connected = client is not None
+            recording = bool(client and client.is_recording())
+            playing = bool(client and client.is_playing())
+            await ctx.respond(
+                f"接続: {'正常' if connected else '未接続'}。"
+                f"聞き取り: {'実行中' if recording else '停止中'}。"
+                f"再生: {'実行中' if playing else '停止中'}。",
+                ephemeral=True,
+            )
+
         @self.bot.slash_command(description="Stop the current voice turn")
         async def stop(ctx: discord.ApplicationContext):
             if not self.voice_client or not self.voice_client.is_recording():
