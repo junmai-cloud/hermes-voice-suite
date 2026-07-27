@@ -40,6 +40,21 @@ voice-bot
 
 The preflight check never prints tokens or API keys.
 
+## Podcast audio production
+
+The production CLI converts a Japanese briefing script to MP3 with OpenAI TTS,
+optionally mixes a low-volume BGM track, and removes MP3 files older than 24 hours.
+Keep the API key in the environment; never pass it on the command line.
+
+```bash
+podcast-render --text-file briefing.txt \\
+  --output ~/hermes-podcasts/evening.mp3 \\
+  --bgm ~/hermes-podcasts/soft-bgm.mp3
+```
+
+Without `--text-file`, the script is read from standard input. The output folder
+should be private and temporary; the CLI does not retain transcripts.
+
 ## Safety and privacy
 
 - Do not commit `.env`, OAuth JSON, Discord tokens, or audio caches.

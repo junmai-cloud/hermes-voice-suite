@@ -17,6 +17,7 @@ test = ["pytest>=8,<9"]
 [project.scripts]
 voice-suite = "voice_suite.cli:main"
 voice-bot = "voice_suite.runner:main"
+podcast-render = "voice_suite.podcast_cli:main"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
