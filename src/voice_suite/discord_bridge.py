@@ -136,6 +136,10 @@ class VoiceBridge:
                 self.voice_client.stop_recording()
             await ctx.respond("自動聞き取りを停止しました。")
 
+        @self.bot.slash_command(description="Show privacy-safe session metrics")
+        async def stats(ctx: discord.ApplicationContext):
+            await ctx.respond(self.metrics.report(), ephemeral=True)
+
         @self.bot.slash_command(description="Stop the current voice turn")
         async def stop(ctx: discord.ApplicationContext):
             if not self.voice_client or not self.voice_client.is_recording():

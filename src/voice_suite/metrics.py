@@ -39,6 +39,16 @@ class SessionMetrics:
     def over_budget(self) -> bool:
         return (self.voice_bytes_sent + self.voice_bytes_received) > self.max_voice_mb * 1_000_000
 
+    def report(self) -> str:
+        total_mb = (self.voice_bytes_sent + self.voice_bytes_received) / 1_000_000
+        status = "通信量超過" if self.over_budget() else "予算内"
+        return (
+            f"音声セッション状況。通信量: {total_mb:.1f} MB（{status}）。"
+            f"発話数: {self.turns}。"
+            f"処理時間: {self.reply_seconds:.1f}秒。"
+            f"割り込み: {self.interruptions}回。"
+        )
+
     def snapshot(self) -> dict[str, int | float]:
         return {
             "voice_bytes_sent": self.voice_bytes_sent,
