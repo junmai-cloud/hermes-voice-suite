@@ -49,6 +49,7 @@ voice-suite demo
 - [x] Discord voice receive/playback bridge prototype (`/join`, `/record`, `/stop`, `/leave`)
 - [x] Pluggable Hermes CLI brain and OpenAI STT/TTS adapters
 - [x] Energy VAD and barge-in control primitives
-- [ ] Low-latency Discord streaming sink
+- [x] Pycord streaming sink for automatic turn boundaries
+- [ ] Low-latency Discord playback interruption
 - [ ] Morning/evening scheduler and 24-hour audio cleanup
 - [ ] VPS deployment and health checks
