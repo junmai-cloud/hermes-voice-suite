@@ -54,6 +54,15 @@ class VoiceBotSettings:
             allowed_user_id=_optional_int("DISCORD_ALLOWED_USER_ID"),
         )
 
+    def authorizes(self, *, user_id: int, guild_id: int | None, voice_channel_id: int | None) -> bool:
+        if self.allowed_user_id is not None and user_id != self.allowed_user_id:
+            return False
+        if self.guild_id is not None and guild_id != self.guild_id:
+            return False
+        if self.voice_channel_id is not None and voice_channel_id != self.voice_channel_id:
+            return False
+        return True
+
 
 def _optional_int(name: str) -> int | None:
     value = os.environ.get(name, "").strip()
@@ -95,6 +104,16 @@ class VoiceBridge:
         self.voice_client = None
         self._register_commands()
 
+    def _authorized_current_voice(self, ctx) -> bool:
+        channel = getattr(self.voice_client, "channel", None)
+        guild_id = getattr(getattr(ctx, "guild", None), "id", None)
+        channel_id = getattr(channel, "id", None)
+        return self.settings.authorizes(
+            user_id=ctx.author.id,
+            guild_id=guild_id,
+            voice_channel_id=channel_id,
+        )
+
     def _register_commands(self) -> None:
         discord = self.discord
 
@@ -103,7 +122,16 @@ class VoiceBridge:
             if not getattr(ctx.author, "voice", None) or not ctx.author.voice.channel:
                 await ctx.respond("先にボイスチャンネルへ入ってください。", ephemeral=True)
                 return
-            self.voice_client = await ctx.author.voice.channel.connect()
+            voice_channel = ctx.author.voice.channel
+            guild_id = getattr(getattr(ctx, "guild", None), "id", None)
+            if not self.settings.authorizes(
+                user_id=ctx.author.id,
+                guild_id=guild_id,
+                voice_channel_id=voice_channel.id,
+            ):
+                await ctx.respond("この音声会議への参加権限がありません。", ephemeral=True)
+                return
+            self.voice_client = await voice_channel.connect()
             await ctx.respond("ボイス会議に参加しました。/record で録音を開始できます。")
 
         @self.bot.slash_command(description="Leave the voice channel")
@@ -118,6 +146,9 @@ class VoiceBridge:
             if not self.voice_client:
                 await ctx.respond("先に /join を実行してください。", ephemeral=True)
                 return
+            if not self._authorized_current_voice(ctx):
+                await ctx.respond("この音声会議の操作権限がありません。", ephemeral=True)
+                return
             if self.voice_client.is_recording():
                 await ctx.respond("すでに録音中です。", ephemeral=True)
                 return
@@ -130,6 +161,9 @@ class VoiceBridge:
         async def listen(ctx: discord.ApplicationContext):
             if not self.voice_client:
                 await ctx.respond("先に /join を実行してください。", ephemeral=True)
+                return
+            if not self._authorized_current_voice(ctx):
+                await ctx.respond("この音声会議の操作権限がありません。", ephemeral=True)
                 return
             if self.voice_client.is_recording():
                 await ctx.respond("すでに聞き取り中です。", ephemeral=True)
