@@ -184,6 +184,22 @@ class VoiceBridge:
                 )
             user_text = self.meeting.user_turn(text)
             if not user_text:
+                reply = self.meeting.clarification_reply()
+                with tempfile.NamedTemporaryFile(prefix="hermes-reply-", suffix=".mp3", delete=False) as raw_output:
+                    clarification_output = Path(raw_output.name)
+                output = clarification_output
+                await asyncio.to_thread(
+                    retry_call,
+                    lambda: self.synthesizer.synthesize(reply, clarification_output),
+                )
+                self.metrics.record_turn(
+                    duration_seconds=time.monotonic() - started,
+                    stt_bytes=stt_bytes,
+                    reply_seconds=0.0,
+                    interrupted=interrupted,
+                )
+                self._play_audio_file(output)
+                output = None
                 return
             reply_started = time.monotonic()
             reply = await asyncio.to_thread(

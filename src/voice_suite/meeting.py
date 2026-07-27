@@ -31,6 +31,10 @@ class MeetingOrchestrator:
         self.transcript.append(("user", cleaned))
         return cleaned
 
+    def clarification_reply(self) -> str:
+        """Ask for a repeat when no usable speech was detected."""
+        return "すみません、うまく聞き取れませんでした。もう一度お願いします。"
+
     def prepare_reply(self, reply: str, *, action: str | None = None) -> str:
         """Apply driving-mode constraints before TTS playback."""
         cleaned = " ".join(reply.split())

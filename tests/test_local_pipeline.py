@@ -30,7 +30,7 @@ class FakeBrain:
 
 class FakeSynthesizer:
     def synthesize(self, text: str, output_path: Path) -> Path:
-        assert text.startswith("今日は")
+        assert text.startswith(("今日は", "すみません"))
         output_path.write_bytes(b"fake-mp3")
         return output_path
 
@@ -64,3 +64,21 @@ def test_local_voice_turn_counts_provider_failure_without_raising():
     )
     asyncio.run(bridge._on_pcm_turn(42, b"\x01\x00" * 48_000))
     assert bridge.metrics.errors == 1
+
+
+def test_empty_transcription_gets_spoken_clarification():
+    class EmptyTranscriber:
+        def transcribe(self, path: Path) -> str:
+            return ""
+
+    bridge = VoiceBridge(
+        VoiceBotSettings("local-test"),
+        transcriber=EmptyTranscriber(),
+        synthesizer=FakeSynthesizer(),
+        brain=FakeBrain(),
+    )
+    client = FakeVoiceClient()
+    bridge.voice_client = client
+    asyncio.run(bridge._on_pcm_turn(42, b"\x01\x00" * 48_000))
+    assert len(client.played) == 1
+    assert bridge.metrics.turns == 1
