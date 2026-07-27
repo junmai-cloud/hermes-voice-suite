@@ -28,9 +28,11 @@ The core is dependency-light and testable without network credentials. Discord/S
 ```bash
 python -m venv .venv
 . .venv/bin/activate
-python -m pip install -e '.[test]'
+python -m pip install -e '.[test,voice]'
 pytest -q
 voice-suite demo
+# After setting DISCORD_BOT_TOKEN and OPENAI_API_KEY:
+voice-bot
 ```
 
 ## Safety and privacy

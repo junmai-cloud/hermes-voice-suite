@@ -29,7 +29,7 @@ class HermesCliBrain:
 
     def answer(self, text: str) -> str:
         result = subprocess.run(
-            [self.command, "chat", "-q", text],
+            [self.command, "chat", "-q", text, "-Q", "--source", "tool"],
             check=False,
             capture_output=True,
             text=True,
