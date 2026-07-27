@@ -10,11 +10,13 @@ from __future__ import annotations
 import asyncio
 import os
 import tempfile
+import wave
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
 from .meeting import MeetingOrchestrator
+from .streaming import StreamingSink
 
 
 class Brain(Protocol):
@@ -112,6 +114,24 @@ class VoiceBridge:
                 self.discord.sinks.WaveSink(), self._recording_finished, ctx.channel
             )
 
+        @self.bot.slash_command(description="Listen continuously and split turns by silence")
+        async def listen(ctx: discord.ApplicationContext):
+            if not self.voice_client:
+                await ctx.respond("先に /join を実行してください。", ephemeral=True)
+                return
+            if self.voice_client.is_recording():
+                await ctx.respond("すでに聞き取り中です。", ephemeral=True)
+                return
+            sink = StreamingSink.as_pycord_sink(self._on_pcm_turn, loop=asyncio.get_running_loop())
+            self.voice_client.start_recording(sink, self._stream_finished, ctx.channel)
+            await ctx.respond("自動聞き取りを開始しました。無音で発話を区切ります。")
+
+        @self.bot.slash_command(description="Stop continuous listening")
+        async def stop_listen(ctx: discord.ApplicationContext):
+            if self.voice_client and self.voice_client.is_recording():
+                self.voice_client.stop_recording()
+            await ctx.respond("自動聞き取りを停止しました。")
+
         @self.bot.slash_command(description="Stop the current voice turn")
         async def stop(ctx: discord.ApplicationContext):
             if not self.voice_client or not self.voice_client.is_recording():
@@ -119,6 +139,48 @@ class VoiceBridge:
                 return
             self.voice_client.stop_recording()
             await ctx.respond("音声を処理しています。")
+
+    async def _on_pcm_turn(self, user_id: int, pcm: bytes) -> None:
+        """Process one VAD-completed turn and play the reply in voice."""
+        self._interrupt_playback()
+        if self.brain is None:
+            return
+        with tempfile.NamedTemporaryFile(prefix="hermes-turn-", suffix=".wav", delete=True) as raw:
+            with wave.open(raw, "wb") as wav:
+                wav.setnchannels(1)
+                wav.setsampwidth(2)
+                wav.setframerate(48_000)
+                wav.writeframes(pcm)
+            text = await asyncio.to_thread(self.transcriber.transcribe, Path(raw.name))
+        user_text = self.meeting.user_turn(text)
+        if not user_text:
+            return
+        reply = await asyncio.to_thread(self._reply_for, user_text)
+        with tempfile.NamedTemporaryFile(prefix="hermes-reply-", suffix=".mp3", delete=False) as raw_output:
+            output = Path(raw_output.name)
+        await asyncio.to_thread(self.synthesizer.synthesize, reply, output)
+        self._play_audio_file(output)
+
+    async def _stream_finished(self, sink, channel) -> None:
+        return None
+
+    def _interrupt_playback(self) -> None:
+        if self.voice_client and self.voice_client.is_playing():
+            self.voice_client.stop()
+
+    def _play_audio_file(self, path: Path) -> None:
+        if not self.voice_client or not path.exists():
+            return
+        self._interrupt_playback()
+        source = self.discord.FFmpegPCMAudio(str(path))
+
+        def cleanup(_error):
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+        self.voice_client.play(source, after=cleanup)
 
     async def _recording_finished(self, sink, channel) -> None:
         """Transcribe each speaker's WAV and play a reply when available."""
