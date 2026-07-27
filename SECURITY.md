@@ -37,6 +37,7 @@ Only counters are retained by the metrics layer: byte counts, durations, turn co
 - Never commit OAuth JSON, `.env`, tokens, or audio caches.
 - Use a bot with only the permissions required for the private voice channel: View Channel, Connect, Speak, Use Voice Activity, and minimal command/message permissions.
 - Do not grant Administrator.
+- Use `DISCORD_ALLOWED_USER_ID` to restrict transcription to the intended user's Discord ID.
 - Rotate any credential that appears in chat, logs, screenshots, or a public repository.
 
 ## Operational release gates

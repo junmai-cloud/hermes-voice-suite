@@ -83,3 +83,14 @@ def test_empty_transcription_gets_spoken_clarification():
     assert len(client.played) == 1
     assert bridge.metrics.turns == 1
     assert bridge.metrics.clarifications == 1
+
+
+def test_disallowed_user_audio_is_ignored():
+    bridge = VoiceBridge(
+        VoiceBotSettings("local-test", allowed_user_id=7),
+        transcriber=FakeTranscriber(),
+        synthesizer=FakeSynthesizer(),
+        brain=FakeBrain(),
+    )
+    asyncio.run(bridge._on_pcm_turn(42, b"\x01\x00" * 48_000))
+    assert bridge.metrics.turns == 0

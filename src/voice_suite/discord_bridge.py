@@ -39,6 +39,7 @@ class VoiceBotSettings:
     token: str
     guild_id: int | None = None
     voice_channel_id: int | None = None
+    allowed_user_id: int | None = None
     command_prefix: str = "!"
 
     @classmethod
@@ -50,6 +51,7 @@ class VoiceBotSettings:
             token=token,
             guild_id=_optional_int("DISCORD_GUILD_ID"),
             voice_channel_id=_optional_int("DISCORD_VOICE_CHANNEL_ID"),
+            allowed_user_id=_optional_int("DISCORD_ALLOWED_USER_ID"),
         )
 
 
@@ -169,6 +171,8 @@ class VoiceBridge:
 
     async def _on_pcm_turn(self, user_id: int, pcm: bytes) -> None:
         """Process one VAD-completed turn without taking down the bot."""
+        if self.settings.allowed_user_id is not None and user_id != self.settings.allowed_user_id:
+            return
         started = time.monotonic()
         interrupted = self._interrupt_playback()
         output: Path | None = None
