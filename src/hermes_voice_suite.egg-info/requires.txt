@@ -1,7 +1,0 @@
-
-[test]
-pytest<9,>=8
-
-[voice]
-discord.py<3,>=2.4
-openai>=1.0
