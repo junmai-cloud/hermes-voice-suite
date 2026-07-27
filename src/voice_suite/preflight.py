@@ -16,7 +16,13 @@ class CheckResult:
 
 def check_environment() -> list[CheckResult]:
     results: list[CheckResult] = []
-    for name in ("DISCORD_BOT_TOKEN", "OPENAI_API_KEY"):
+    for name in (
+        "DISCORD_BOT_TOKEN",
+        "OPENAI_API_KEY",
+        "DISCORD_GUILD_ID",
+        "DISCORD_VOICE_CHANNEL_ID",
+        "DISCORD_ALLOWED_USER_ID",
+    ):
         present = bool(os.environ.get(name, "").strip())
         results.append(CheckResult(name, present, "設定済み" if present else "未設定"))
     for tool in ("ffmpeg", "hermes"):

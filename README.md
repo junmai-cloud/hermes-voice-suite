@@ -33,7 +33,8 @@ pytest -q
 voice-suite demo
 # Offline check before connecting to Discord:
 .venv/bin/voice-bot --check
-# After setting DISCORD_BOT_TOKEN and OPENAI_API_KEY:
+# After setting the Discord token, OpenAI key, guild ID,
+# voice-channel ID, and allowed-user ID:
 voice-bot
 ```
 
