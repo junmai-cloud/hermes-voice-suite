@@ -47,6 +47,7 @@ voice-suite demo
 - [ ] Google Calendar adapter using the existing Hermes token
 - [ ] Japanese STT/TTS adapter
 - [x] Discord voice receive/playback bridge prototype (`/join`, `/record`, `/stop`, `/leave`)
+- [x] Pluggable Hermes CLI brain and OpenAI STT/TTS adapters
 - [ ] Low-latency VAD and barge-in
 - [ ] Morning/evening scheduler and 24-hour audio cleanup
 - [ ] VPS deployment and health checks

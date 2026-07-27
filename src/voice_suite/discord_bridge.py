@@ -17,6 +17,10 @@ from typing import Protocol
 from .meeting import MeetingOrchestrator
 
 
+class Brain(Protocol):
+    def answer(self, text: str) -> str: ...
+
+
 class AudioTranscriber(Protocol):
     def transcribe(self, wav_path: Path) -> str: ...
 
@@ -58,6 +62,7 @@ class VoiceBridge:
         *,
         transcriber: AudioTranscriber,
         synthesizer: SpeechSynthesizer,
+        brain: Brain | None = None,
         meeting: MeetingOrchestrator | None = None,
     ) -> None:
         try:
@@ -68,6 +73,7 @@ class VoiceBridge:
         self.settings = settings
         self.transcriber = transcriber
         self.synthesizer = synthesizer
+        self.brain = brain
         self.meeting = meeting or MeetingOrchestrator()
         intents = discord.Intents.default()
         intents.message_content = True
@@ -131,8 +137,9 @@ class VoiceBridge:
                 await channel.send(reply, file=self.discord.File(str(output)))
 
     def _reply_for(self, text: str) -> str:
-        # The Hermes adapter will replace this deterministic first bridge.
-        return self.meeting.prepare_reply(f"受け取りました。次は『{text}』について整理します。")
+        if self.brain is None:
+            raise RuntimeError("A conversation brain is required before starting the voice bot")
+        return self.meeting.prepare_reply(self.brain.answer(text))
 
     def run(self) -> None:
         self.bot.run(self.settings.token)
