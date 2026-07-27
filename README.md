@@ -54,6 +54,7 @@ voice-bot
 - [x] Energy VAD and barge-in control primitives
 - [x] Pycord streaming sink for automatic turn boundaries
 - [x] Voice playback with speech interruption (`/listen`, `/stop_listen`)
+- [x] Opus-compressed STT uploads and explicit mobile-data budget
 - [ ] Live Discord connection test with production credentials
 - [ ] Morning/evening scheduler and 24-hour audio cleanup
 - [ ] VPS deployment and health checks
