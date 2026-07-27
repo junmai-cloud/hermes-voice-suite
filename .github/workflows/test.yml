@@ -1,0 +1,38 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install package and test dependencies
+        run: python -m pip install -e '.[test]'
+      - name: Run tests
+        run: pytest -q
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check for common credential files
+        run: |
+          ! find . -type f \( -name '*.env' -o -name '*client_secret*.json' -o -name 'google_token.json' \) -not -path './.git/*' | grep .
+      - name: Check for private key and token markers
+        run: |
+          ! git grep -n -E 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|GOCSPX-|ghp_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9_-]{20,}' -- ':!SECURITY.md'
