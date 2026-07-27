@@ -48,6 +48,7 @@ voice-suite demo
 - [ ] Japanese STT/TTS adapter
 - [x] Discord voice receive/playback bridge prototype (`/join`, `/record`, `/stop`, `/leave`)
 - [x] Pluggable Hermes CLI brain and OpenAI STT/TTS adapters
-- [ ] Low-latency VAD and barge-in
+- [x] Energy VAD and barge-in control primitives
+- [ ] Low-latency Discord streaming sink
 - [ ] Morning/evening scheduler and 24-hour audio cleanup
 - [ ] VPS deployment and health checks
