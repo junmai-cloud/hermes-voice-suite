@@ -61,6 +61,8 @@ The preflight check never prints tokens or API keys.
 - [x] Privacy-safe metrics report (`/stats`, no transcript/audio content)
 - [x] Opus-compressed STT uploads and explicit mobile-data budget
 - [x] Privacy-preserving session metrics (bytes, latency counters, no transcript storage)
+- [x] Safe offline preflight check (`voice-bot --check`)
+- [x] Real Discord test checklist and secret-free `.env.example`
 - [ ] Live Discord connection test with production credentials
 - [ ] Morning/evening scheduler and 24-hour audio cleanup
 - [ ] VPS deployment and health checks
