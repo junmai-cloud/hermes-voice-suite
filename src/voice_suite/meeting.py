@@ -35,6 +35,15 @@ class MeetingOrchestrator:
         """Ask for a repeat when no usable speech was detected."""
         return "すみません、うまく聞き取れませんでした。もう一度お願いします。"
 
+    def is_cancel_command(self, text: str) -> bool:
+        """Recognize the short, high-priority spoken cancellation command."""
+        normalized = "".join(text.split()).lower()
+        return normalized in {"止めて", "とめて", "キャンセル", "中止"}
+
+    def cancel_pending(self) -> str:
+        """Return a safe acknowledgement without executing any pending action."""
+        return "止めました。保留中の操作は実行しません。"
+
     def prepare_reply(self, reply: str, *, action: str | None = None) -> str:
         """Apply driving-mode constraints before TTS playback."""
         cleaned = " ".join(reply.split())

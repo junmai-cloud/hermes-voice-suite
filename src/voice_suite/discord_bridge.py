@@ -236,6 +236,10 @@ class VoiceBridge:
                     lambda: self.transcriber.transcribe(Path(raw.name)),
                 )
             user_text = self.meeting.user_turn(text)
+            if user_text and self.meeting.is_cancel_command(user_text):
+                # Cancellation is terminal for this turn: do not call the brain,
+                # do not synthesize, and do not execute any pending action.
+                return
             if not user_text:
                 self.metrics.record_clarification()
                 reply = self.meeting.clarification_reply()

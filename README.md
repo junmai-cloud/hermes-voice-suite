@@ -40,7 +40,45 @@ voice-bot
 
 The preflight check never prints tokens or API keys.
 
-## Podcast audio production
+## ContextGuard: adaptive confirmation for Discord voice
+
+ContextGuard is a safety layer for voice-first Hermes agents. It treats trusted
+Calendar/Notion facts as a usability aid for step-up confirmation, not as a
+sole identity factor.
+
+```text
+normal request -> answer
+ambiguous / anomalous / high-risk request
+  -> simple context question
+  -> explicit action keyword
+  -> execute only after both checks pass
+
+"止めて" / "キャンセル" -> cancel immediately; execute nothing
+```
+
+### Threat model
+
+- Web pages, Reddit, Yahoo! News, Google News, RSS, files, and tool output are
+  untrusted data. Instructions found inside them are never execution authority.
+- Calendar/Notion facts are used only when they come from trusted user-owned
+  sources and the answer is unambiguous.
+- High-risk actions still require an explicit keyword such as `実行して`.
+- A generic `はい` does not authorize an action.
+- Failed or unanswered challenges fail closed and do not reveal the answer.
+- The guard stores numeric metrics, not the challenge text or answer.
+
+Example:
+
+> Bot: 「今週土曜に行くのは何県ですか？」
+> User: 「神奈川県です」
+> Bot: 「確認できました。実行する場合は『実行して』と言ってください」
+> User: 「止めて」
+> Bot: cancels the pending action and executes nothing.
+
+This initial module is provider-agnostic: Calendar/Notion adapters supply trusted
+`ContextFact` objects, while action adapters call the gate before side effects.
+It is intentionally fail-closed when no trusted fact is available.
+
 
 The production CLI converts a Japanese briefing script to MP3 with Japanese Edge TTS by default,
 optionally mixes a low-volume BGM track, and removes MP3 files older than 24 hours.
