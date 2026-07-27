@@ -154,31 +154,39 @@ class VoiceBridge:
             await ctx.respond("音声を処理しています。")
 
     async def _on_pcm_turn(self, user_id: int, pcm: bytes) -> None:
-        """Process one VAD-completed turn and play the reply in voice."""
+        """Process one VAD-completed turn without taking down the bot."""
         started = time.monotonic()
         interrupted = self._interrupt_playback()
-        if self.brain is None:
-            return
-        with tempfile.NamedTemporaryFile(prefix="hermes-turn-", suffix=".webm", delete=True) as raw:
-            pcm_to_webm_opus(pcm, Path(raw.name))
-            stt_bytes = Path(raw.name).stat().st_size
-            text = await asyncio.to_thread(self.transcriber.transcribe, Path(raw.name))
-        user_text = self.meeting.user_turn(text)
-        if not user_text:
-            return
-        reply_started = time.monotonic()
-        reply = await asyncio.to_thread(self._reply_for, user_text)
-        reply_seconds = time.monotonic() - reply_started
-        with tempfile.NamedTemporaryFile(prefix="hermes-reply-", suffix=".mp3", delete=False) as raw_output:
-            output = Path(raw_output.name)
-        await asyncio.to_thread(self.synthesizer.synthesize, reply, output)
-        self.metrics.record_turn(
-            duration_seconds=time.monotonic() - started,
-            stt_bytes=stt_bytes,
-            reply_seconds=reply_seconds,
-            interrupted=interrupted,
-        )
-        self._play_audio_file(output)
+        output: Path | None = None
+        try:
+            if self.brain is None:
+                return
+            with tempfile.NamedTemporaryFile(prefix="hermes-turn-", suffix=".webm", delete=True) as raw:
+                pcm_to_webm_opus(pcm, Path(raw.name))
+                stt_bytes = Path(raw.name).stat().st_size
+                text = await asyncio.to_thread(self.transcriber.transcribe, Path(raw.name))
+            user_text = self.meeting.user_turn(text)
+            if not user_text:
+                return
+            reply_started = time.monotonic()
+            reply = await asyncio.to_thread(self._reply_for, user_text)
+            reply_seconds = time.monotonic() - reply_started
+            with tempfile.NamedTemporaryFile(prefix="hermes-reply-", suffix=".mp3", delete=False) as raw_output:
+                output = Path(raw_output.name)
+            await asyncio.to_thread(self.synthesizer.synthesize, reply, output)
+            self.metrics.record_turn(
+                duration_seconds=time.monotonic() - started,
+                stt_bytes=stt_bytes,
+                reply_seconds=reply_seconds,
+                interrupted=interrupted,
+            )
+            self._play_audio_file(output)
+            output = None
+        except Exception:
+            self.metrics.record_error()
+        finally:
+            if output is not None:
+                output.unlink(missing_ok=True)
 
     async def _stream_finished(self, sink, channel) -> None:
         return None

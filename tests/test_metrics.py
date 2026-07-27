@@ -14,6 +14,7 @@ def test_metrics_track_bytes_and_turns_without_transcript():
         "stt_bytes": 500,
         "reply_seconds": 1.4,
         "interruptions": 1,
+        "errors": 0,
     }
     assert "transcript" not in snapshot
 

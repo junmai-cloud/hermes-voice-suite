@@ -49,3 +49,18 @@ def test_local_voice_turn_runs_full_pipeline():
     assert bridge.metrics.turns == 1
     assert bridge.metrics.stt_bytes > 0
     assert bridge.metrics.snapshot()["stt_bytes"] < 10_000
+
+
+def test_local_voice_turn_counts_provider_failure_without_raising():
+    class BrokenTranscriber:
+        def transcribe(self, path: Path) -> str:
+            raise RuntimeError("provider unavailable")
+
+    bridge = VoiceBridge(
+        VoiceBotSettings("local-test"),
+        transcriber=BrokenTranscriber(),
+        synthesizer=FakeSynthesizer(),
+        brain=FakeBrain(),
+    )
+    asyncio.run(bridge._on_pcm_turn(42, b"\x01\x00" * 48_000))
+    assert bridge.metrics.errors == 1
