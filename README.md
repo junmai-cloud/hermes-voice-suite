@@ -50,6 +50,7 @@ voice-suite demo
 - [x] Pluggable Hermes CLI brain and OpenAI STT/TTS adapters
 - [x] Energy VAD and barge-in control primitives
 - [x] Pycord streaming sink for automatic turn boundaries
-- [ ] Low-latency Discord playback interruption
+- [x] Voice playback with speech interruption (`/listen`, `/stop_listen`)
+- [ ] Live Discord connection test with production credentials
 - [ ] Morning/evening scheduler and 24-hour audio cleanup
 - [ ] VPS deployment and health checks
