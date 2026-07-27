@@ -10,11 +10,11 @@ from __future__ import annotations
 import asyncio
 import os
 import tempfile
-import wave
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+from .audio import pcm_to_webm_opus
 from .meeting import MeetingOrchestrator
 from .streaming import StreamingSink
 
@@ -145,12 +145,8 @@ class VoiceBridge:
         self._interrupt_playback()
         if self.brain is None:
             return
-        with tempfile.NamedTemporaryFile(prefix="hermes-turn-", suffix=".wav", delete=True) as raw:
-            with wave.open(raw, "wb") as wav:
-                wav.setnchannels(1)
-                wav.setsampwidth(2)
-                wav.setframerate(48_000)
-                wav.writeframes(pcm)
+        with tempfile.NamedTemporaryFile(prefix="hermes-turn-", suffix=".webm", delete=True) as raw:
+            pcm_to_webm_opus(pcm, Path(raw.name))
             text = await asyncio.to_thread(self.transcriber.transcribe, Path(raw.name))
         user_text = self.meeting.user_turn(text)
         if not user_text:

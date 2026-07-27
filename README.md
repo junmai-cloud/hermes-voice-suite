@@ -41,6 +41,7 @@ voice-bot
 - Driving mode is voice-only: short turns, no visual interaction, and complex actions are deferred for confirmation.
 - Calendar writes are never implicit; the agent proposes first and only writes on explicit instruction.
 - Temporary audio is intended for short retention and can be deleted after delivery.
+- STT uploads use WebM/Opus rather than raw PCM/WAV to reduce server-side transfer.
 
 ## Roadmap
 
