@@ -42,9 +42,9 @@ The preflight check never prints tokens or API keys.
 
 ## Podcast audio production
 
-The production CLI converts a Japanese briefing script to MP3 with OpenAI TTS,
+The production CLI converts a Japanese briefing script to MP3 with Japanese Edge TTS by default,
 optionally mixes a low-volume BGM track, and removes MP3 files older than 24 hours.
-Keep the API key in the environment; never pass it on the command line.
+Use `--provider openai` only when an OpenAI key is configured.
 
 ```bash
 podcast-render --text-file briefing.txt \\
