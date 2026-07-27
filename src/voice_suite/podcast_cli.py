@@ -13,6 +13,15 @@ from .adapters import OpenAISynthesizer
 from .podcast import PodcastProducer, remove_expired_audio
 
 
+def _duration_seconds(path: Path) -> float:
+    result = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+         "-of", "default=noprint_wrappers=1:nokey=1", str(path)],
+        check=True, capture_output=True, text=True,
+    )
+    return float(result.stdout.strip())
+
+
 class EdgeJapaneseSynthesizer:
     def __init__(self, voice: str = "ja-JP-KeitaNeural") -> None:
         self.voice = voice
@@ -37,6 +46,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--voice", default="ja-JP-KeitaNeural")
     parser.add_argument("--provider", choices=("edge", "openai"), default="edge")
     parser.add_argument("--retention-hours", type=float, default=24.0)
+    parser.add_argument("--min-seconds", type=float, default=300.0)
+    parser.add_argument("--max-seconds", type=float, default=900.0)
     args = parser.parse_args(argv)
 
     text = args.text_file.read_text(encoding="utf-8") if args.text_file else sys.stdin.read()
@@ -47,7 +58,14 @@ def main(argv: list[str] | None = None) -> int:
     PodcastProducer(
         EdgeJapaneseSynthesizer(args.voice) if args.provider == "edge" else OpenAISynthesizer(voice=args.voice)
     ).produce(text, args.output, bgm_path=args.bgm)
+    duration = _duration_seconds(args.output)
+    if not args.min_seconds <= duration <= args.max_seconds:
+        raise RuntimeError(
+            f"podcast duration {duration:.1f}s is outside "
+            f"{args.min_seconds:.0f}-{args.max_seconds:.0f}s"
+        )
     print(f"podcast_created={args.output}")
+    print(f"duration_seconds={duration:.1f}")
     print(f"expired_audio_removed={removed}")
     return 0
 
