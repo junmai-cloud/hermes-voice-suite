@@ -107,7 +107,7 @@ class VoiceBridge:
     def _authorized_current_voice(self, ctx) -> bool:
         channel = getattr(self.voice_client, "channel", None)
         guild_id = getattr(getattr(ctx, "guild", None), "id", None)
-        channel_id = getattr(channel, "id", None)
+        channel_id = getattr(channel, "id", self.settings.voice_channel_id)
         return self.settings.authorizes(
             user_id=ctx.author.id,
             guild_id=guild_id,
@@ -136,6 +136,9 @@ class VoiceBridge:
 
         @self.bot.slash_command(description="Leave the voice channel")
         async def leave(ctx: discord.ApplicationContext):
+            if not self._authorized_current_voice(ctx):
+                await ctx.respond("この音声会議の操作権限がありません。", ephemeral=True)
+                return
             if self.voice_client:
                 await self.voice_client.disconnect()
                 self.voice_client = None
@@ -174,16 +177,25 @@ class VoiceBridge:
 
         @self.bot.slash_command(description="Stop continuous listening")
         async def stop_listen(ctx: discord.ApplicationContext):
+            if not self._authorized_current_voice(ctx):
+                await ctx.respond("この音声会議の操作権限がありません。", ephemeral=True)
+                return
             if self.voice_client and self.voice_client.is_recording():
                 self.voice_client.stop_recording()
             await ctx.respond("自動聞き取りを停止しました。")
 
         @self.bot.slash_command(description="Show privacy-safe session metrics")
         async def stats(ctx: discord.ApplicationContext):
+            if not self._authorized_current_voice(ctx):
+                await ctx.respond("この音声会議の参照権限がありません。", ephemeral=True)
+                return
             await ctx.respond(self.metrics.report(), ephemeral=True)
 
         @self.bot.slash_command(description="Show connection and listening status")
         async def health(ctx: discord.ApplicationContext):
+            if not self._authorized_current_voice(ctx):
+                await ctx.respond("この音声会議の参照権限がありません。", ephemeral=True)
+                return
             client = self.voice_client
             connected = client is not None
             recording = bool(client and client.is_recording())
@@ -197,6 +209,9 @@ class VoiceBridge:
 
         @self.bot.slash_command(description="Stop the current voice turn")
         async def stop(ctx: discord.ApplicationContext):
+            if not self._authorized_current_voice(ctx):
+                await ctx.respond("この音声会議の操作権限がありません。", ephemeral=True)
+                return
             if not self.voice_client or not self.voice_client.is_recording():
                 await ctx.respond("録音中ではありません。", ephemeral=True)
                 return
