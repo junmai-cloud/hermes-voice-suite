@@ -83,7 +83,12 @@ class VoiceBridge:
         self.metrics = metrics or SessionMetrics()
         intents = discord.Intents.default()
         intents.message_content = True
-        self.bot = discord.Bot(intents=intents)
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        self.bot = discord.Bot(intents=intents, loop=loop)
         self.voice_client = None
         self._register_commands()
 
