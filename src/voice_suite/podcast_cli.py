@@ -6,6 +6,7 @@ import argparse
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 from .adapters import OpenAISynthesizer
@@ -18,10 +19,13 @@ class EdgeJapaneseSynthesizer:
         self.command = shutil.which("edge-tts") or "/usr/local/lib/hermes-agent/venv/bin/edge-tts"
 
     def synthesize(self, text: str, output_path: Path) -> Path:
-        subprocess.run(
-            [self.command, "--voice", self.voice, "--text", text, "--write-media", str(output_path)],
-            check=True,
-        )
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".txt") as source:
+            source.write(text)
+            source.flush()
+            subprocess.run(
+                [self.command, "--voice", self.voice, "--file", source.name, "--write-media", str(output_path)],
+                check=True,
+            )
         return output_path
 
 
