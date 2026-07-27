@@ -1,0 +1,22 @@
+[project]
+name = "hermes-voice-suite"
+version = "0.1.0"
+description = "Voice-first personal agent: daily briefings and Discord meeting mode"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+voice = [
+  "discord.py>=2.4,<3",
+  "openai>=1.0",
+]
+
+test = ["pytest>=8,<9"]
+
+[project.scripts]
+voice-suite = "voice_suite.cli:main"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

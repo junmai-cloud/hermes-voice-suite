@@ -1,0 +1,14 @@
+LICENSE
+README.md
+pyproject.toml
+src/hermes_voice_suite.egg-info/PKG-INFO
+src/hermes_voice_suite.egg-info/SOURCES.txt
+src/hermes_voice_suite.egg-info/dependency_links.txt
+src/hermes_voice_suite.egg-info/entry_points.txt
+src/hermes_voice_suite.egg-info/requires.txt
+src/hermes_voice_suite.egg-info/top_level.txt
+src/voice_suite/__init__.py
+src/voice_suite/briefing.py
+src/voice_suite/cli.py
+src/voice_suite/meeting.py
+tests/test_core.py
