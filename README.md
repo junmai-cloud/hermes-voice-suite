@@ -31,9 +31,13 @@ python -m venv .venv
 python -m pip install -e '.[test,voice]'
 pytest -q
 voice-suite demo
+# Offline check before connecting to Discord:
+.venv/bin/voice-bot --check
 # After setting DISCORD_BOT_TOKEN and OPENAI_API_KEY:
 voice-bot
 ```
+
+The preflight check never prints tokens or API keys.
 
 ## Safety and privacy
 
