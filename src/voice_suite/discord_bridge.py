@@ -18,6 +18,7 @@ from typing import Protocol
 from .audio import pcm_to_webm_opus
 from .meeting import MeetingOrchestrator
 from .metrics import SessionMetrics
+from .retry import retry_call
 from .streaming import StreamingSink
 
 
@@ -164,16 +165,25 @@ class VoiceBridge:
             with tempfile.NamedTemporaryFile(prefix="hermes-turn-", suffix=".webm", delete=True) as raw:
                 pcm_to_webm_opus(pcm, Path(raw.name))
                 stt_bytes = Path(raw.name).stat().st_size
-                text = await asyncio.to_thread(self.transcriber.transcribe, Path(raw.name))
+                text = await asyncio.to_thread(
+                    retry_call,
+                    lambda: self.transcriber.transcribe(Path(raw.name)),
+                )
             user_text = self.meeting.user_turn(text)
             if not user_text:
                 return
             reply_started = time.monotonic()
-            reply = await asyncio.to_thread(self._reply_for, user_text)
+            reply = await asyncio.to_thread(
+                retry_call,
+                lambda: self._reply_for(user_text),
+            )
             reply_seconds = time.monotonic() - reply_started
             with tempfile.NamedTemporaryFile(prefix="hermes-reply-", suffix=".mp3", delete=False) as raw_output:
                 output = Path(raw_output.name)
-            await asyncio.to_thread(self.synthesizer.synthesize, reply, output)
+            await asyncio.to_thread(
+                retry_call,
+                lambda: self.synthesizer.synthesize(reply, output),
+            )
             self.metrics.record_turn(
                 duration_seconds=time.monotonic() - started,
                 stt_bytes=stt_bytes,
@@ -218,13 +228,22 @@ class VoiceBridge:
                 wav_path = Path(temp) / f"{user_id}.wav"
                 audio.file.seek(0)
                 wav_path.write_bytes(audio.file.read())
-                text = await asyncio.to_thread(self.transcriber.transcribe, wav_path)
+                text = await asyncio.to_thread(
+                    retry_call,
+                    lambda: self.transcriber.transcribe(wav_path),
+                )
                 user_text = self.meeting.user_turn(text)
                 if not user_text:
                     continue
-                reply = await asyncio.to_thread(self._reply_for, user_text)
+                reply = await asyncio.to_thread(
+                    retry_call,
+                    lambda: self._reply_for(user_text),
+                )
                 output = Path(temp) / "reply.mp3"
-                await asyncio.to_thread(self.synthesizer.synthesize, reply, output)
+                await asyncio.to_thread(
+                    retry_call,
+                    lambda: self.synthesizer.synthesize(reply, output),
+                )
                 await channel.send(reply, file=self.discord.File(str(output)))
 
     def _reply_for(self, text: str) -> str:
