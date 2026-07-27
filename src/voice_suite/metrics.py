@@ -18,6 +18,7 @@ class SessionMetrics:
     reply_seconds: float = 0.0
     interruptions: int = 0
     errors: int = 0
+    clarifications: int = 0
 
     def add_voice_bytes(self, *, sent: int, received: int) -> None:
         self.voice_bytes_sent += max(0, sent)
@@ -43,6 +44,9 @@ class SessionMetrics:
     def record_error(self) -> None:
         self.errors += 1
 
+    def record_clarification(self) -> None:
+        self.clarifications += 1
+
     def report(self) -> str:
         total_mb = (self.voice_bytes_sent + self.voice_bytes_received) / 1_000_000
         status = "通信量超過" if self.over_budget() else "予算内"
@@ -52,6 +56,7 @@ class SessionMetrics:
             f"処理時間: {self.reply_seconds:.1f}秒。"
             f"割り込み: {self.interruptions}回。"
             f"エラー: {self.errors}回。"
+            f"聞き返し: {self.clarifications}回。"
         )
 
     def snapshot(self) -> dict[str, int | float]:
@@ -64,4 +69,5 @@ class SessionMetrics:
             "reply_seconds": self.reply_seconds,
             "interruptions": self.interruptions,
             "errors": self.errors,
+            "clarifications": self.clarifications,
         }

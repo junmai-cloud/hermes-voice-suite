@@ -184,6 +184,7 @@ class VoiceBridge:
                 )
             user_text = self.meeting.user_turn(text)
             if not user_text:
+                self.metrics.record_clarification()
                 reply = self.meeting.clarification_reply()
                 with tempfile.NamedTemporaryFile(prefix="hermes-reply-", suffix=".mp3", delete=False) as raw_output:
                     clarification_output = Path(raw_output.name)

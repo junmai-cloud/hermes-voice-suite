@@ -82,3 +82,4 @@ def test_empty_transcription_gets_spoken_clarification():
     asyncio.run(bridge._on_pcm_turn(42, b"\x01\x00" * 48_000))
     assert len(client.played) == 1
     assert bridge.metrics.turns == 1
+    assert bridge.metrics.clarifications == 1
