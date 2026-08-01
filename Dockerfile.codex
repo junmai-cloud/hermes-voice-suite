@@ -28,7 +28,8 @@ RUN /opt/venv/bin/python -m pip install --upgrade pip \
 
 RUN useradd --create-home --uid 10002 --shell /bin/bash codex \
     && mkdir --parents /codex-home /workspace \
-    && chown --recursive codex:codex /codex-home /workspace
+    && chown --recursive codex:codex /codex-home /workspace \
+    && git config --system --add safe.directory /workspace
 
 USER codex
 
