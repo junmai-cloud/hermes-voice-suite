@@ -7,6 +7,10 @@ services:
       dockerfile: Dockerfile
     image: hermes-voice-suite:local
     restart: unless-stopped
+    # The installed Hermes currently runs as root and reads /root/.hermes.
+    # Keep the staged container compatible without copying secrets into Git.
+    user: "0:0"
+    working_dir: /root/.hermes
     # Discord voice uses a negotiated UDP session.  Keep this Linux VPS
     # service on the host network until the real voice test proves bridge
     # networking is safe for the deployment.
@@ -20,6 +24,10 @@ services:
       CODEX_WORKER_TOKEN: ${CODEX_WORKER_TOKEN:?set CODEX_WORKER_TOKEN in .env}
     volumes:
       - hermes-state:/var/lib/hermes
+      - /usr/local/bin/hermes:/usr/local/bin/hermes:ro
+      - /usr/local/lib/hermes-agent:/usr/local/lib/hermes-agent:ro
+      - /usr/local/share/uv:/usr/local/share/uv:ro
+      - /root/.hermes:/root/.hermes:ro
     depends_on:
       codex-worker:
         condition: service_started

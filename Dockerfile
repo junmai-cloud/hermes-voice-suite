@@ -7,6 +7,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
+        bash \
         ca-certificates \
         ffmpeg \
         libopus0 \
