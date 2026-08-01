@@ -72,6 +72,11 @@ def _optional_int(name: str) -> int | None:
 class VoiceBridge:
     """Pycord bridge for join/leave/start/stop and spoken replies."""
 
+    # One early STT snapshot is enough to capture a conclusion-first request.
+    # The rest of the utterance is transcribed once after VAD detects silence.
+    VOICE_HEAD_MS = 2_000
+    VOICE_HEAD_OVERLAP_MS = 400
+
     def __init__(
         self,
         settings: VoiceBotSettings,
@@ -93,6 +98,14 @@ class VoiceBridge:
         self.brain = brain
         self.meeting = meeting or MeetingOrchestrator()
         self.metrics = metrics or SessionMetrics()
+        self._voice_head_tasks: dict[int, asyncio.Task] = {}
+        self.bot = None
+        # Keep the policy and audio-turn code importable in dependency-light
+        # environments (and in tests).  The production runner's preflight
+        # still requires Pycord before it attempts to connect to Discord.
+        if not hasattr(discord, "Bot"):
+            self.voice_client = None
+            return
         intents = discord.Intents.default()
         intents.message_content = True
         try:
@@ -140,6 +153,7 @@ class VoiceBridge:
                 await ctx.respond("この音声会議の操作権限がありません。", ephemeral=True)
                 return
             if self.voice_client:
+                await self._cancel_voice_head_tasks()
                 await self.voice_client.disconnect()
                 self.voice_client = None
             await ctx.respond("ボイス会議から退出しました。")
@@ -171,7 +185,12 @@ class VoiceBridge:
             if self.voice_client.is_recording():
                 await ctx.respond("すでに聞き取り中です。", ephemeral=True)
                 return
-            sink = StreamingSink.as_pycord_sink(self._on_pcm_turn, loop=asyncio.get_running_loop())
+            sink = StreamingSink.as_pycord_sink(
+                self._on_pcm_turn,
+                on_head=self._schedule_voice_head,
+                head_ms=self.VOICE_HEAD_MS,
+                loop=asyncio.get_running_loop(),
+            )
             self.voice_client.start_recording(sink, self._stream_finished, ctx.channel)
             await ctx.respond("自動聞き取りを開始しました。無音で発話を区切ります。")
 
@@ -220,21 +239,20 @@ class VoiceBridge:
 
     async def _on_pcm_turn(self, user_id: int, pcm: bytes) -> None:
         """Process one VAD-completed turn without taking down the bot."""
+        head_task = self._voice_head_tasks.pop(user_id, None)
         if self.settings.allowed_user_id is not None and user_id != self.settings.allowed_user_id:
+            if head_task and not head_task.done():
+                head_task.cancel()
             return
         started = time.monotonic()
         interrupted = self._interrupt_playback()
         output: Path | None = None
         try:
             if self.brain is None:
+                if head_task and not head_task.done():
+                    head_task.cancel()
                 return
-            with tempfile.NamedTemporaryFile(prefix="hermes-turn-", suffix=".webm", delete=True) as raw:
-                pcm_to_webm_opus(pcm, Path(raw.name))
-                stt_bytes = Path(raw.name).stat().st_size
-                text = await asyncio.to_thread(
-                    retry_call,
-                    lambda: self.transcriber.transcribe(Path(raw.name)),
-                )
+            text, stt_bytes = await self._transcribe_two_stage(pcm, head_task)
             user_text = self.meeting.user_turn(text)
             if user_text and self.meeting.is_cancel_command(user_text):
                 # Cancellation is terminal for this turn: do not call the brain,
@@ -284,6 +302,100 @@ class VoiceBridge:
         finally:
             if output is not None:
                 output.unlink(missing_ok=True)
+
+    def _schedule_voice_head(self, user_id: int, pcm: bytes) -> None:
+        """Start exactly one non-queued STT task for the first two seconds."""
+        existing = self._voice_head_tasks.get(user_id)
+        if existing and not existing.done():
+            # Never build a backlog.  The completed-turn path can still
+            # transcribe the available audio without this early result.
+            return
+        loop = asyncio.get_running_loop()
+        self._voice_head_tasks[user_id] = loop.create_task(
+            self._transcribe_pcm(pcm, prefix="hermes-head-")
+        )
+
+    async def _transcribe_two_stage(
+        self,
+        pcm: bytes,
+        head_task: asyncio.Task | None,
+    ) -> tuple[str, int]:
+        """Transcribe one head and one tail, never a queue of chunks."""
+        bytes_per_ms = 48_000 * 2 // 1000
+        head_bytes = bytes_per_ms * self.VOICE_HEAD_MS
+        overlap_bytes = bytes_per_ms * self.VOICE_HEAD_OVERLAP_MS
+
+        if head_task is None:
+            return await self._transcribe_pcm(pcm, prefix="hermes-turn-")
+
+        # For turns longer than the head window, transcribe the remaining
+        # audio immediately.  A small overlap protects words at the boundary.
+        tail_task = None
+        if len(pcm) > head_bytes:
+            tail_pcm = pcm[max(0, head_bytes - overlap_bytes):]
+            tail_task = asyncio.create_task(
+                self._transcribe_pcm(tail_pcm, prefix="hermes-tail-")
+            )
+
+        tasks = [head_task] + ([tail_task] if tail_task is not None else [])
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        head_result = results[0]
+        tail_result = results[1] if tail_task is not None else None
+        head_text, head_bytes_written = self._transcription_result(head_result)
+        tail_text, tail_bytes_written = self._transcription_result(tail_result)
+        text = self._merge_transcripts(head_text, tail_text)
+        return text, head_bytes_written + tail_bytes_written
+
+    async def _transcribe_pcm(self, pcm: bytes, *, prefix: str) -> tuple[str, int]:
+        """Encode and transcribe one PCM segment, cleaning up its temp file."""
+        input_path: Path | None = None
+        try:
+            # Close the temporary file before ffmpeg opens it.  Windows keeps
+            # an open NamedTemporaryFile locked.
+            with tempfile.NamedTemporaryFile(prefix=prefix, suffix=".webm", delete=False) as raw:
+                input_path = Path(raw.name)
+            pcm_to_webm_opus(pcm, input_path)
+            stt_bytes = input_path.stat().st_size
+            text = await asyncio.to_thread(
+                retry_call,
+                lambda: self.transcriber.transcribe(input_path),
+            )
+            return text, stt_bytes
+        finally:
+            if input_path is not None:
+                input_path.unlink(missing_ok=True)
+
+    @staticmethod
+    def _transcription_result(result) -> tuple[str, int]:
+        if isinstance(result, BaseException) or result is None:
+            return "", 0
+        text, stt_bytes = result
+        return str(text or "").strip(), int(stt_bytes)
+
+    @staticmethod
+    def _merge_transcripts(head: str, tail: str) -> str:
+        """Join overlapping Japanese/Latin STT text without obvious repeats."""
+        head = head.strip()
+        tail = tail.strip()
+        if not head:
+            return tail
+        if not tail:
+            return head
+        max_overlap = min(64, len(head), len(tail))
+        for size in range(max_overlap, 1, -1):
+            if head[-size:] == tail[:size]:
+                return f"{head}{tail[size:]}".strip()
+        return f"{head} {tail}".strip()
+
+    async def _cancel_voice_head_tasks(self) -> None:
+        """Cancel early STT work without leaving tasks behind on disconnect."""
+        tasks = [task for task in self._voice_head_tasks.values() if not task.done()]
+        self._voice_head_tasks.clear()
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
 
     async def _stream_finished(self, sink, channel) -> None:
         return None
@@ -339,4 +451,6 @@ class VoiceBridge:
         return self.meeting.prepare_reply(self.brain.answer(text))
 
     def run(self) -> None:
+        if self.bot is None:
+            raise RuntimeError("Pycord is required to run the Discord voice bot")
         self.bot.run(self.settings.token)

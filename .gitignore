@@ -8,3 +8,5 @@ __pycache__/
 !pyproject.json
 voice-cache/
 audio-cache/
+secrets/
+runtime/

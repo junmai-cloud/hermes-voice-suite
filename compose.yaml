@@ -1,0 +1,98 @@
+name: hermes-voice-suite
+
+services:
+  hermes-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hermes-voice-suite:local
+    restart: unless-stopped
+    # Discord voice uses a negotiated UDP session.  Keep this Linux VPS
+    # service on the host network until the real voice test proves bridge
+    # networking is safe for the deployment.
+    network_mode: host
+    env_file:
+      - .env
+    environment:
+      VOICE_TECH_LEDGER_PATH: /var/lib/hermes/technical-ledger.sqlite3
+      CODEX_VPS_WORKER_URL: http://127.0.0.1:8765
+      CODEX_AUDITOR_URL: http://127.0.0.1:8766
+      CODEX_WORKER_TOKEN: ${CODEX_WORKER_TOKEN:?set CODEX_WORKER_TOKEN in .env}
+    volumes:
+      - hermes-state:/var/lib/hermes
+    depends_on:
+      codex-worker:
+        condition: service_started
+      codex-auditor:
+        condition: service_started
+    security_opt:
+      - no-new-privileges:true
+
+  codex-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.codex
+    image: hermes-voice-suite-codex:local
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8765:8765"
+    environment:
+      CODEX_HOME: /codex-home
+      CODEX_REPO_PATH: /workspace
+      CODEX_WORKER_TOKEN: ${CODEX_WORKER_TOKEN:?set CODEX_WORKER_TOKEN in .env}
+      CODEX_SANDBOX: workspace-write
+    command:
+      - --worker-id
+      - vps-codex
+      - --role
+      - implementer
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8765"
+      - --repo
+      - /workspace
+    volumes:
+      - .:/workspace
+      - codex-home:/codex-home
+    security_opt:
+      - no-new-privileges:true
+
+  codex-auditor:
+    build:
+      context: .
+      dockerfile: Dockerfile.codex
+    image: hermes-voice-suite-codex:local
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8766:8766"
+    environment:
+      CODEX_HOME: /codex-home
+      CODEX_REPO_PATH: /workspace
+      CODEX_WORKER_TOKEN: ${CODEX_WORKER_TOKEN:?set CODEX_WORKER_TOKEN in .env}
+      CODEX_SANDBOX: read-only
+    command:
+      - --worker-id
+      - vps-codex-auditor
+      - --role
+      - auditor
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8766"
+      - --repo
+      - /workspace
+      - --sandbox
+      - read-only
+    volumes:
+      - .:/workspace:ro
+      - codex-home:/codex-home
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  hermes-state:
+  codex-home:

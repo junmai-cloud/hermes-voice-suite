@@ -28,6 +28,15 @@ def check_environment() -> list[CheckResult]:
     for tool in ("ffmpeg", "hermes"):
         path = shutil.which(tool)
         results.append(CheckResult(tool, path is not None, "利用可能" if path else "PATHに未検出"))
+    try:
+        import discord
+
+        pycord_ready = hasattr(discord, "Bot") and hasattr(discord, "sinks")
+        detail = "Pycord voice API available" if pycord_ready else "Pycord is required (discord.Bot/discord.sinks missing)"
+    except ImportError:
+        pycord_ready = False
+        detail = "Pycord is required (discord module not installed)"
+    results.append(CheckResult("pycord", pycord_ready, detail))
     return results
 
 

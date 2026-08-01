@@ -48,6 +48,18 @@ class EnergyVAD:
         """Finish a partial turn, useful when recording stops."""
         return self._finish() if self._speaking and self._turn else None
 
+    def preview(self, duration_ms: int) -> bytes | None:
+        """Return the beginning of the active turn once it is long enough.
+
+        This is deliberately a snapshot: it does not consume or alter the
+        active turn.  The streaming layer uses it for one early STT call while
+        VAD continues collecting the complete utterance.
+        """
+        if not self._speaking or self._turn_ms < duration_ms:
+            return None
+        bytes_per_ms = self.sample_rate * 2 // 1000
+        return bytes(self._turn[: bytes_per_ms * duration_ms])
+
     @staticmethod
     def _rms(frame: bytes) -> int:
         samples = array.array("h")

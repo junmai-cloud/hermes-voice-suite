@@ -23,6 +23,24 @@ Calendar + news + user context -> BriefingComposer -> TTS -> Discord attachment
 
 The core is dependency-light and testable without network credentials. Discord/STT/TTS adapters are optional boundaries so the conversation policy can be tested locally first.
 
+## Hermes × Codex technical operations
+
+Technical changes now have a privacy-safe SQLite ledger and a fail-closed audit gate.
+Hermes records the command result, local Codex is preferred for implementation when
+available, and VPS Codex audits code/config/audio/routing/restart/deploy changes.
+Hermes can report completion only after a `PASS` or `PASS_WITH_WARNINGS` verdict.
+If the audit fails, the result includes an improvement plan and a short voice message
+for JUNMAI BOT to relay back to the user; the change is not deployed.
+
+```bash
+voice-suite tech create --summary "small code change" --operation code_change --repo . --branch codex/small-change
+voice-suite tech list
+voice-suite tech show TECH_TASK_ID
+```
+
+See [docs/TECHNICAL_OPERATIONS.md](docs/TECHNICAL_OPERATIONS.md) for the non-technical
+workflow, worker setup, audit JSON contract, and local-PC/VPS fallback behavior.
+
 ## Quick start
 
 ```bash
