@@ -78,6 +78,12 @@ class CodexCliWorker:
         self.command = command
         self.sandbox = sandbox
         self.default_repo = Path(default_repo) if default_repo else None
+        self.skip_git_repo_check = os.environ.get("CODEX_SKIP_GIT_REPO_CHECK", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
         self._jobs: dict[str, subprocess.Popen[str]] = {}
         self._lock = threading.Lock()
 
@@ -110,7 +116,10 @@ class CodexCliWorker:
         executable = shutil.which(self.command)
         if executable is None:
             raise WorkerUnavailable(f"Codex executable not found: {self.command}")
-        command = self._command_prefix(executable) + ["exec", "--sandbox", self.sandbox, prompt]
+        command = self._command_prefix(executable) + ["exec"]
+        if self.skip_git_repo_check:
+            command.append("--skip-git-repo-check")
+        command.extend(["--sandbox", self.sandbox, prompt])
         process = subprocess.Popen(
             command,
             cwd=repo,
