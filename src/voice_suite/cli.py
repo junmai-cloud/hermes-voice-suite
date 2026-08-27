@@ -1,10 +1,16 @@
 """Local demo CLI for the shared voice-agent core."""
 
+import sys
+
 from .briefing import BriefingComposer, BriefingItem
 from .meeting import MeetingMode, MeetingOrchestrator, MeetingPolicy
 
 
 def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] == "tech":
+        from .technical_cli import main as technical_main
+
+        raise SystemExit(technical_main(sys.argv[2:]))
     composer = BriefingComposer()
     print(composer.compose(
         today=[BriefingItem("夜の保険更新", "20時30分から。", "high")],

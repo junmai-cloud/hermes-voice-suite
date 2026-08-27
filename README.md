@@ -23,6 +23,46 @@ Calendar + news + user context -> BriefingComposer -> TTS -> Discord attachment
 
 The core is dependency-light and testable without network credentials. Discord/STT/TTS adapters are optional boundaries so the conversation policy can be tested locally first.
 
+## Hermes × Codex technical operations
+
+Technical changes now have a privacy-safe SQLite ledger and a fail-closed audit gate.
+Hermes records the command result, local Codex is preferred for implementation when
+available, and VPS Codex audits code/config/audio/routing/restart/deploy changes.
+Hermes can report completion only after a `PASS` or `PASS_WITH_WARNINGS` verdict.
+If the audit fails, the result includes an improvement plan and a short voice message
+for JUNMAI BOT to relay back to the user; the change is not deployed.
+
+```bash
+voice-suite tech create --summary "small code change" --operation code_change --repo . --branch codex/small-change
+voice-suite tech list
+voice-suite tech show TECH_TASK_ID
+```
+
+See [docs/TECHNICAL_OPERATIONS.md](docs/TECHNICAL_OPERATIONS.md) for the non-technical
+workflow, worker setup, audit JSON contract, and local-PC/VPS fallback behavior.
+
+## JUNMAI / Codex Discord path
+
+The JUNMAI/Codex Discord Bot is designed as a separate application and Compose
+service. Its text and voice turns use `codex-discord-bot` and the dedicated
+prompt-only `codex-chat-worker`; they do not pass through the Hermes Gateway's
+outbound audit or technical-task worker. The Chat Worker is read-only and fixes
+Codex CLI to `--sandbox read-only`. See
+[docs/CODEX_DISCORD_BOT.md](docs/CODEX_DISCORD_BOT.md) and
+[docs/JUNMAI_DISCORD_SYSTEM_ARCHITECTURE.md](docs/JUNMAI_DISCORD_SYSTEM_ARCHITECTURE.md).
+
+For the local-PC version, enter the dedicated Discord token locally and run:
+
+```powershell
+python .\scripts\provision_local_codex_secrets.py
+python -m voice_suite.codex_local_cli --check
+python -m voice_suite.codex_local_cli
+```
+
+This local entry point uses the configured Codex server/channel IDs, starts a
+loopback-only prompt worker on `127.0.0.1:8777`, and never starts Hermes or its
+technical worker/auditor path.
+
 ## Quick start
 
 ```bash

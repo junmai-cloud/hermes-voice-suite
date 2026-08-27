@@ -1,0 +1,14 @@
+.git
+.github
+.venv
+__pycache__
+.pytest_cache
+*.py[cod]
+*.egg-info
+.env
+secrets
+runtime
+voice-cache
+audio-cache
+tests
+docs

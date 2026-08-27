@@ -94,3 +94,29 @@ def test_disallowed_user_audio_is_ignored():
     )
     asyncio.run(bridge._on_pcm_turn(42, b"\x01\x00" * 48_000))
     assert bridge.metrics.turns == 0
+
+
+def test_voice_turn_uses_one_head_and_one_tail_stt_without_full_repeat():
+    class CountingTranscriber:
+        def __init__(self):
+            self.calls = []
+
+        def transcribe(self, path: Path) -> str:
+            self.calls.append(path.name)
+            return "結論" if len(self.calls) == 1 else "を説明します"
+
+    async def run():
+        transcriber = CountingTranscriber()
+        bridge = VoiceBridge(
+            VoiceBotSettings("local-test"),
+            transcriber=transcriber,
+            synthesizer=FakeSynthesizer(),
+            brain=FakeBrain(),
+        )
+        full_pcm = b"\x01\x00" * (48_000 * 3)
+        head_pcm = full_pcm[: 48_000 * 2]
+        bridge._schedule_voice_head(42, head_pcm)
+        await bridge._on_pcm_turn(42, full_pcm)
+        assert len(transcriber.calls) == 2
+
+    asyncio.run(run())
