@@ -99,6 +99,9 @@ class VoiceBridge:
         self.meeting = meeting or MeetingOrchestrator()
         self.metrics = metrics or SessionMetrics()
         self._voice_head_tasks: dict[int, asyncio.Task] = {}
+        self._voice_loop: asyncio.AbstractEventLoop | None = None
+        self._stream_sink = None
+        self._recording_sink = None
         self.bot = None
         # Keep the policy and audio-turn code importable in dependency-light
         # environments (and in tests).  The production runner's preflight
@@ -113,6 +116,7 @@ class VoiceBridge:
         except RuntimeError:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
+        self._voice_loop = loop
         self.bot = discord.Bot(intents=intents, loop=loop)
         self.voice_client = None
         self._register_commands()
@@ -170,8 +174,13 @@ class VoiceBridge:
                 await ctx.respond("すでに録音中です。", ephemeral=True)
                 return
             await ctx.respond("聞いています。終わったら /stop を押してください。")
+            sink = self.discord.sinks.WaveSink()
+            self._recording_sink = sink
             self.voice_client.start_recording(
-                self.discord.sinks.WaveSink(), self._recording_finished, ctx.channel
+                sink,
+                lambda exception, recording_sink=sink: self._recording_finished(
+                    exception, recording_sink
+                ),
             )
 
         @self.bot.slash_command(description="Listen continuously and split turns by silence")
@@ -185,13 +194,18 @@ class VoiceBridge:
             if self.voice_client.is_recording():
                 await ctx.respond("すでに聞き取り中です。", ephemeral=True)
                 return
+            self._voice_loop = asyncio.get_running_loop()
             sink = StreamingSink.as_pycord_sink(
                 self._on_pcm_turn,
                 on_head=self._schedule_voice_head,
                 head_ms=self.VOICE_HEAD_MS,
-                loop=asyncio.get_running_loop(),
+                loop=self._voice_loop,
             )
-            self.voice_client.start_recording(sink, self._stream_finished, ctx.channel)
+            self._stream_sink = sink
+            self.voice_client.start_recording(
+                sink,
+                lambda exception: self._stream_finished(exception),
+            )
             await ctx.respond("自動聞き取りを開始しました。無音で発話を区切ります。")
 
         @self.bot.slash_command(description="Stop continuous listening")
@@ -310,7 +324,13 @@ class VoiceBridge:
             # Never build a backlog.  The completed-turn path can still
             # transcribe the available audio without this early result.
             return
-        loop = asyncio.get_running_loop()
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = self._voice_loop
+        if loop is None or not loop.is_running():
+            return
+        self._voice_loop = loop
         self._voice_head_tasks[user_id] = loop.create_task(
             self._transcribe_pcm(pcm, prefix="hermes-head-")
         )
@@ -397,8 +417,14 @@ class VoiceBridge:
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
 
-    async def _stream_finished(self, sink, channel) -> None:
-        return None
+    def _stream_finished(self, exception=None) -> None:
+        """Flush the final VAD turns from Pycord's one-argument callback."""
+        sink = self._stream_sink
+        self._stream_sink = None
+        if exception is not None:
+            self.metrics.record_error()
+        if sink is not None:
+            sink.bridge.cleanup()
 
     def _interrupt_playback(self) -> bool:
         if self.voice_client and self.voice_client.is_playing():
@@ -420,9 +446,23 @@ class VoiceBridge:
 
         self.voice_client.play(source, after=cleanup)
 
-    async def _recording_finished(self, sink, channel) -> None:
+    def _recording_finished(self, exception=None, sink=None) -> None:
+        """Schedule processing for Pycord's one-argument recording callback."""
+        if sink is None:
+            sink = self._recording_sink
+        self._recording_sink = None
+        if exception is not None:
+            self.metrics.record_error()
+            return
+        if sink is None:
+            self.metrics.record_error()
+            return
+        self._schedule_coroutine(self._process_recording(sink))
+
+    async def _process_recording(self, sink) -> None:
         """Transcribe each speaker's WAV and play a reply when available."""
         for user_id, audio in sink.audio_data.items():
+            user_id = getattr(user_id, "id", user_id)
             with tempfile.TemporaryDirectory(prefix="hermes-voice-") as temp:
                 wav_path = Path(temp) / f"{user_id}.wav"
                 audio.file.seek(0)
@@ -438,12 +478,39 @@ class VoiceBridge:
                     retry_call,
                     lambda: self._reply_for(user_text),
                 )
-                output = Path(temp) / "reply.mp3"
-                await asyncio.to_thread(
-                    retry_call,
-                    lambda: self.synthesizer.synthesize(reply, output),
-                )
-                await channel.send(reply, file=self.discord.File(str(output)))
+                output: Path | None = None
+                try:
+                    # The voice player runs after this coroutine yields.  Keep
+                    # the reply outside the WAV TemporaryDirectory until the
+                    # player's after-callback removes it.
+                    with tempfile.NamedTemporaryFile(
+                        prefix="hermes-reply-", suffix=".mp3", delete=False
+                    ) as raw_output:
+                        output = Path(raw_output.name)
+                    await asyncio.to_thread(
+                        retry_call,
+                        lambda: self.synthesizer.synthesize(reply, output),
+                    )
+                    self._play_audio_file(output)
+                    output = None
+                finally:
+                    if output is not None:
+                        output.unlink(missing_ok=True)
+
+    def _schedule_coroutine(self, coroutine) -> None:
+        """Schedule a coroutine from either the event loop or Pycord thread."""
+        try:
+            current_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            current_loop = None
+        loop = self._voice_loop or current_loop
+        if loop is None or not loop.is_running():
+            coroutine.close()
+            return
+        if current_loop is loop:
+            loop.create_task(coroutine)
+            return
+        asyncio.run_coroutine_threadsafe(coroutine, loop)
 
     def _reply_for(self, text: str) -> str:
         if self.brain is None:

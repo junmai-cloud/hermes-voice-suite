@@ -103,6 +103,66 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  codex-chat-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.codex
+    image: hermes-voice-suite-codex:local
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8777:8777"
+    environment:
+      CODEX_HOME: /codex-chat-home
+      CODEX_REPO_PATH: /workspace
+      CODEX_CHAT_WORKDIR: /workspace
+      CODEX_CHAT_WORKER_TOKEN: ${CODEX_CHAT_WORKER_TOKEN:?set CODEX_CHAT_WORKER_TOKEN in .env}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?set OPENAI_API_KEY in .env}
+    entrypoint: ["codex-chat"]
+    command:
+      - serve
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8777"
+    volumes:
+      - .:/workspace:ro
+      - codex-chat-home:/codex-chat-home
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+  codex-discord-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.codex-discord
+    image: hermes-voice-suite-codex-discord:local
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      CODEX_DISCORD_BOT_TOKEN: ${CODEX_DISCORD_BOT_TOKEN:?set CODEX_DISCORD_BOT_TOKEN in .env}
+      CODEX_DISCORD_GUILD_ID: ${CODEX_DISCORD_GUILD_ID:?set CODEX_DISCORD_GUILD_ID in .env}
+      CODEX_DISCORD_TEXT_CHANNEL_ID: ${CODEX_DISCORD_TEXT_CHANNEL_ID:?set CODEX_DISCORD_TEXT_CHANNEL_ID in .env}
+      CODEX_DISCORD_VOICE_CHANNEL_ID: ${CODEX_DISCORD_VOICE_CHANNEL_ID:?set CODEX_DISCORD_VOICE_CHANNEL_ID in .env}
+      CODEX_DISCORD_ALLOWED_USER_ID: ${CODEX_DISCORD_ALLOWED_USER_ID:-}
+      CODEX_CHAT_WORKER_URL: http://127.0.0.1:8777
+      CODEX_CHAT_WORKER_TOKEN: ${CODEX_CHAT_WORKER_TOKEN:?set CODEX_CHAT_WORKER_TOKEN in .env}
+      CODEX_CHAT_WORKER_TIMEOUT: ${CODEX_CHAT_WORKER_TIMEOUT:-90}
+      CODEX_STT_MODEL: ${CODEX_STT_MODEL:-gpt-4o-mini-transcribe}
+      CODEX_TTS_MODEL: ${CODEX_TTS_MODEL:-gpt-4o-mini-tts}
+      CODEX_TTS_VOICE: ${CODEX_TTS_VOICE:-alloy}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?set OPENAI_API_KEY in .env}
+    depends_on:
+      codex-chat-worker:
+        condition: service_started
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
 volumes:
   hermes-state:
   codex-home:
+  codex-chat-home:

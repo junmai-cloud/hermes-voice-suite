@@ -4,8 +4,45 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .env
+.env.*
+!.env.example
+codex-ssh-config
 *.json
 !pyproject.json
+
+# Test, type-checking, lint, and build artifacts
+.coverage
+.coverage.*
+.mypy_cache/
+.pyright/
+.ruff_cache/
+.tox/
+.nox/
+htmlcov/
+build/
+dist/
+pip-wheel-metadata/
+
+# Local logs, databases, and captured media
+*.log
+*.db
+*.sqlite
+*.sqlite3
+*.wav
+*.mp3
+*.ogg
+*.m4a
+*.flac
+
+# Local secret material and OS/editor files
+*.pem
+*.key
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
 voice-cache/
 audio-cache/
 secrets/

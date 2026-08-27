@@ -4,6 +4,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     CODEX_HOME=/codex-home \
+    CODEX_CHAT_HOME=/codex-chat-home \
     CODEX_REPO_PATH=/workspace \
     PATH=/opt/venv/bin:${PATH}
 
@@ -28,8 +29,8 @@ RUN /opt/venv/bin/python -m pip install --upgrade pip \
     && npm install --global @openai/codex
 
 RUN useradd --create-home --uid 10002 --shell /bin/bash codex \
-    && mkdir --parents /codex-home /workspace \
-    && chown --recursive codex:codex /codex-home /workspace \
+    && mkdir --parents /codex-home /codex-chat-home /workspace \
+    && chown --recursive codex:codex /codex-home /codex-chat-home /workspace \
     && git config --system --add safe.directory /workspace
 
 USER codex

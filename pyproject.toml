@@ -18,6 +18,9 @@ test = ["pytest>=8,<9"]
 voice-suite = "voice_suite.cli:main"
 voice-tech = "voice_suite.technical_cli:main"
 voice-bot = "voice_suite.runner:main"
+codex-voice-bot = "voice_suite.codex_runner:main"
+codex-local-bot = "voice_suite.codex_local_cli:main"
+codex-chat = "voice_suite.codex_chat_cli:main"
 podcast-render = "voice_suite.podcast_cli:main"
 
 [tool.pytest.ini_options]

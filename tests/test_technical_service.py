@@ -13,7 +13,7 @@ from voice_suite.technical_ops import (
     WorkerStatus,
     WorkerResult,
 )
-from voice_suite.technical_service import TechnicalOrchestrator
+from voice_suite.technical_service import TechnicalOrchestrator, WorkerPool
 
 
 @dataclass
@@ -144,3 +144,24 @@ def test_failed_audit_requires_user_acceptance_before_repair(tmp_path):
         orchestrator.dispatch(task.task_id, "apply the improvement plan")
     orchestrator.confirm(task.task_id)
     assert orchestrator.dispatch(task.task_id, "apply the improvement plan").worker_id == "local-codex"
+
+
+def test_worker_pool_binds_each_job_to_one_ready_slot():
+    first = FakeWorker("local-codex-1")
+    second = FakeWorker("local-codex-2")
+    pool = WorkerPool([first, second], pool_id="local-burst")
+    task = type("Task", (), {"task_id": "task-1"})()
+    job1 = pool.submit(task, "first")
+    first.ready = False
+    job2 = pool.submit(task, "second")
+    assert job1 == "local-codex-1-job-1"
+    assert job2 == "local-codex-2-job-1"
+    assert pool.collect_result(job1).state == "completed"
+    assert pool.status().ready
+
+
+def test_worker_pool_fails_closed_when_no_slot_is_ready():
+    pool = WorkerPool([FakeWorker("local-codex-1", False)], pool_id="local-burst")
+    assert not pool.status().ready
+    with pytest.raises(Exception, match="no ready worker slot"):
+        pool.submit(type("Task", (), {"task_id": "task-1"})(), "work")

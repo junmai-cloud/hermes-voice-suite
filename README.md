@@ -41,6 +41,28 @@ voice-suite tech show TECH_TASK_ID
 See [docs/TECHNICAL_OPERATIONS.md](docs/TECHNICAL_OPERATIONS.md) for the non-technical
 workflow, worker setup, audit JSON contract, and local-PC/VPS fallback behavior.
 
+## JUNMAI / Codex Discord path
+
+The JUNMAI/Codex Discord Bot is designed as a separate application and Compose
+service. Its text and voice turns use `codex-discord-bot` and the dedicated
+prompt-only `codex-chat-worker`; they do not pass through the Hermes Gateway's
+outbound audit or technical-task worker. The Chat Worker is read-only and fixes
+Codex CLI to `--sandbox read-only`. See
+[docs/CODEX_DISCORD_BOT.md](docs/CODEX_DISCORD_BOT.md) and
+[docs/JUNMAI_DISCORD_SYSTEM_ARCHITECTURE.md](docs/JUNMAI_DISCORD_SYSTEM_ARCHITECTURE.md).
+
+For the local-PC version, enter the dedicated Discord token locally and run:
+
+```powershell
+python .\scripts\provision_local_codex_secrets.py
+python -m voice_suite.codex_local_cli --check
+python -m voice_suite.codex_local_cli
+```
+
+This local entry point uses the configured Codex server/channel IDs, starts a
+loopback-only prompt worker on `127.0.0.1:8777`, and never starts Hermes or its
+technical worker/auditor path.
+
 ## Quick start
 
 ```bash

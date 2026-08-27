@@ -5,11 +5,19 @@ This repository now includes a staged Docker layout for the VPS:
 ```text
 hermes-gateway   Discord voice and Hermes orchestration
 codex-worker     VPS implementation worker
-codex-auditor   read-only independent audit worker
+codex-auditor     read-only independent audit worker
+codex-chat-worker  JUNMAI/Codex prompt-only read-only worker
+codex-discord-bot  JUNMAI/Codex separate Discord application
 ```
 
 The compose file is a deployment scaffold. It does not change the currently
 running systemd service until the cutover commands are deliberately run.
+
+The JUNMAI/Codex path is not a Hermes Gateway cutover. It is a separate Bot
+and Chat Worker pair. It must not reuse the Hermes Discord token, technical
+worker token, or Hermes outbound-audit path. The two services can be built and
+started individually without restarting Hermes Gateway, `codex-worker`, or
+`codex-auditor`.
 
 ## Why the voice service uses host networking
 
@@ -32,13 +40,40 @@ cp .env.example .env
 chmod 600 .env
 ```
 
-Set the Discord/OpenAI values and create a private worker token in `.env`.
+Set the Discord/OpenAI values and create private technical and Chat Worker
+tokens in `.env`. `CODEX_DISCORD_BOT_TOKEN` must belong to the separate JUNMAI
+Discord application and must differ from `DISCORD_BOT_TOKEN`.
 Never paste the file contents into chat or commit the file.
 
-Build the images:
+For the isolated JUNMAI/Codex path, the minimum required values are
+`CODEX_DISCORD_BOT_TOKEN`, `CODEX_CHAT_WORKER_TOKEN`, the three configured
+Discord IDs, and `OPENAI_API_KEY`. The Bot service deliberately does not use
+`env_file: .env`; Compose passes only the explicitly listed values.
+
+Build only the isolated path:
 
 ```bash
-docker compose build
+docker compose build codex-chat-worker codex-discord-bot
+```
+
+Start only the isolated path, in two targeted operations:
+
+```bash
+docker compose up -d --no-deps codex-chat-worker
+docker compose up -d --no-deps codex-discord-bot
+docker compose ps codex-chat-worker codex-discord-bot
+docker compose logs --tail 100 codex-chat-worker codex-discord-bot
+```
+
+Confirm the Chat Worker health endpoint using the token without printing it.
+Then confirm Discord login/Ready, voice-channel connection, audio receive, and
+TTS playback. Do not report recovery from container state alone.
+
+If the technical worker/auditor stack itself is being updated, build only
+those images:
+
+```bash
+docker compose build codex-worker codex-auditor
 ```
 
 Authenticate Codex in the persistent `codex-home` volume. On a headless VPS,

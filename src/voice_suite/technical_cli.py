@@ -22,7 +22,7 @@ from .technical_ops import (
     TaskState,
     WorkerRole,
 )
-from .technical_service import TechnicalOrchestrator
+from .technical_service import TechnicalOrchestrator, WorkerPool
 
 
 def _emit(value: Any, *, as_json: bool = False) -> None:
@@ -61,12 +61,28 @@ def _worker_from_config(
 def _orchestrator(ledger: TechnicalLedger) -> TechnicalOrchestrator:
     vps = _worker_from_config("vps-codex", role=WorkerRole.IMPLEMENTER, url_name="CODEX_VPS_WORKER_URL")
     local = None
-    if os.environ.get("CODEX_LOCAL_WORKER_URL", "").strip():
+    local_url = os.environ.get("CODEX_LOCAL_WORKER_URL", "").strip()
+    if local_url:
         local = _worker_from_config(
             "local-codex",
             role=WorkerRole.IMPLEMENTER,
             url_name="CODEX_LOCAL_WORKER_URL",
         )
+    else:
+        try:
+            local_slots = max(0, int(os.environ.get("CODEX_LOCAL_WORKER_SLOTS", "1")))
+        except ValueError as exc:
+            raise SystemExit("CODEX_LOCAL_WORKER_SLOTS must be an integer") from exc
+        if local_slots:
+            workers = [
+                _worker_from_config(
+                    f"local-codex-{index + 1}",
+                    role=WorkerRole.IMPLEMENTER,
+                    url_name="__CODEX_LOCAL_DISABLED__",
+                )
+                for index in range(local_slots)
+            ]
+            local = workers[0] if len(workers) == 1 else WorkerPool(workers, pool_id="local-codex-burst")
     audit_url = os.environ.get("CODEX_AUDITOR_URL", "").strip()
     vps_url = os.environ.get("CODEX_VPS_WORKER_URL", "").strip()
     if audit_url:

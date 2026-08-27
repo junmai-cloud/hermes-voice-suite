@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Sequence
 
 from .technical_ledger import TechnicalLedger
 from .technical_ops import (
@@ -13,6 +13,9 @@ from .technical_ops import (
     OperationKind,
     TaskState,
     TechnicalTask,
+    WorkerResult,
+    WorkerState,
+    WorkerStatus,
     WorkerUnavailable,
 )
 
@@ -22,6 +25,65 @@ class DispatchResult:
     task_id: str
     worker_id: str
     job_id: str
+
+
+class WorkerPool:
+    """Select among ready workers and fail over without sharing task ownership.
+
+    A pool is intentionally a thin boundary: it does not merge worktrees or
+    grant permissions. Each submitted job is bound to exactly one worker until
+    it completes or is cancelled. This allows a local burst pool to coexist
+    with the VPS fallback while preserving the auditor boundary.
+    """
+
+    def __init__(self, workers: Sequence[CodexWorker], *, pool_id: str):
+        if not workers:
+            raise ValueError("worker pool must contain at least one worker")
+        self.workers = tuple(workers)
+        self.worker_id = pool_id
+        self.role = self.workers[0].role
+        self._jobs: dict[str, CodexWorker] = {}
+
+    def status(self) -> WorkerStatus:
+        statuses = [worker.status() for worker in self.workers]
+        ready = next((status for status in statuses if status.ready), None)
+        if ready is not None:
+            return WorkerStatus(
+                self.worker_id,
+                self.role,
+                WorkerState.READY,
+                ready.last_heartbeat,
+                tuple(sorted({cap for status in statuses for cap in status.capabilities})),
+                "at least one worker slot is ready",
+            )
+        if any(status.state is WorkerState.BUSY for status in statuses):
+            return WorkerStatus(self.worker_id, self.role, WorkerState.BUSY, message="all worker slots are busy")
+        return WorkerStatus(self.worker_id, self.role, WorkerState.UNAVAILABLE, message="no worker slot is ready")
+
+    def submit(self, task: TechnicalTask, prompt: str) -> str:
+        candidates = [worker for worker in self.workers if worker.status().ready]
+        if not candidates:
+            raise WorkerUnavailable(f"no ready worker slot in {self.worker_id}")
+        worker = candidates[0]
+        job_id = worker.submit(task, prompt)
+        self._jobs[job_id] = worker
+        return job_id
+
+    def collect_result(self, job_id: str) -> WorkerResult:
+        worker = self._jobs.get(job_id)
+        if worker is None:
+            raise KeyError(f"unknown pooled job: {job_id}")
+        result = worker.collect_result(job_id)
+        if result.state != "running":
+            self._jobs.pop(job_id, None)
+        return result
+
+    def cancel(self, job_id: str) -> None:
+        worker = self._jobs.get(job_id)
+        if worker is None:
+            raise KeyError(f"unknown pooled job: {job_id}")
+        worker.cancel(job_id)
+        self._jobs.pop(job_id, None)
 
 
 class TechnicalOrchestrator:
