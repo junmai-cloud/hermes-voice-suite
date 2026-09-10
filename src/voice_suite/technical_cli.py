@@ -97,7 +97,7 @@ def _orchestrator(ledger: TechnicalLedger) -> TechnicalOrchestrator:
             "vps-codex-auditor",
             role=WorkerRole.AUDITOR,
             command=os.environ.get("CODEX_COMMAND", "codex"),
-            sandbox=os.environ.get("CODEX_SANDBOX", "workspace-write"),
+            sandbox="read-only",
             default_repo=os.environ.get("CODEX_REPO_PATH"),
         )
     return TechnicalOrchestrator(ledger, vps_worker=vps, local_worker=local, auditor_worker=auditor)
@@ -289,7 +289,11 @@ def build_parser() -> argparse.ArgumentParser:
     worker.add_argument("--token", default=os.environ.get("CODEX_WORKER_TOKEN", ""))
     worker.add_argument("--repo", default=os.environ.get("CODEX_REPO_PATH"))
     worker.add_argument("--command", default=os.environ.get("CODEX_COMMAND", "codex"))
-    worker.add_argument("--sandbox", default=os.environ.get("CODEX_SANDBOX", "workspace-write"))
+    worker.add_argument(
+        "--sandbox",
+        choices=("read-only", "workspace-write"),
+        default=os.environ.get("CODEX_SANDBOX", "workspace-write"),
+    )
     worker.set_defaults(handler=_worker)
     return parser
 

@@ -73,6 +73,12 @@ class CodexCliWorker:
         sandbox: str = "workspace-write",
         default_repo: str | Path | None = None,
     ) -> None:
+        allowed_sandboxes = {"read-only", "workspace-write"}
+        if sandbox not in allowed_sandboxes:
+            allowed = ", ".join(sorted(allowed_sandboxes))
+            raise ValueError(f"unsupported Codex worker sandbox {sandbox!r}; expected one of: {allowed}")
+        if role is WorkerRole.AUDITOR and sandbox != "read-only":
+            raise ValueError("Codex auditor sandbox must be read-only")
         self.worker_id = worker_id
         self.role = role
         self.command = command

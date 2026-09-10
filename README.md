@@ -25,12 +25,11 @@ The core is dependency-light and testable without network credentials. Discord/S
 
 ## Hermes × Codex technical operations
 
-Technical changes now have a privacy-safe SQLite ledger and a fail-closed audit gate.
-Hermes records the command result, local Codex is preferred for implementation when
-available, and VPS Codex audits code/config/audio/routing/restart/deploy changes.
-Hermes can report completion only after a `PASS` or `PASS_WITH_WARNINGS` verdict.
-If the audit fails, the result includes an improvement plan and a short voice message
-for JUNMAI BOT to relay back to the user; the change is not deployed.
+Hermes and Codex use separate ownership boundaries. Hermes owns its runtime
+operations; Codex owns its runtime and cross-system control-plane integrations.
+The SQLite ledger and auditor are available for scoped Codex technical work,
+but the VPS auditor is not a universal gate for Hermes operations. Each owner
+verifies its own side, and high-impact changes still require explicit user approval.
 
 ```bash
 voice-suite tech create --summary "small code change" --operation code_change --repo . --branch codex/small-change
@@ -40,6 +39,10 @@ voice-suite tech show TECH_TASK_ID
 
 See [docs/TECHNICAL_OPERATIONS.md](docs/TECHNICAL_OPERATIONS.md) for the non-technical
 workflow, worker setup, audit JSON contract, and local-PC/VPS fallback behavior.
+
+Codex plugins use a four-gate acceptance check: installed, enabled,
+authenticated, and live API access. Package presence alone is never considered
+ready. See [docs/CODEX_PLUGIN_ACCEPTANCE.md](docs/CODEX_PLUGIN_ACCEPTANCE.md).
 
 ## JUNMAI / Codex Discord path
 
@@ -141,11 +144,30 @@ should be private and temporary; the CLI does not retain transcripts.
 - Temporary audio is intended for short retention and can be deleted after delivery.
 - STT uploads use WebM/Opus rather than raw PCM/WAV to reduce server-side transfer.
 
+## Google Calendar authentication
+
+Install the optional adapter and place the Google installed-application client
+file at `~/.config/hermes-voice-suite/google-calendar/client_secret.json`.
+OAuth material must remain outside this repository. Diagnose and recover the
+read-only connection with:
+
+```bash
+uv sync --extra calendar
+uv run python -m voice_suite.google_calendar_cli diagnose
+uv run python -m voice_suite.google_calendar_cli recover
+uv run python -m voice_suite.google_calendar_cli check
+```
+
+`recover` first refreshes an expired access token. If Google rejects the refresh
+token, it starts the browser consent flow and saves the replacement token with
+owner-only permissions. `check` makes a read-only request for the primary
+calendar and does not read or print event contents.
+
 ## Roadmap
 
 - [x] Shared briefing and meeting policies
 - [x] Deterministic local demo and tests
-- [ ] Google Calendar adapter using the existing Hermes token
+- [x] Google Calendar OAuth recovery and read-only connection check
 - [ ] Japanese STT/TTS adapter
 - [x] Discord voice receive/playback bridge prototype (`/join`, `/record`, `/stop`, `/leave`)
 - [x] Pluggable Hermes CLI brain and OpenAI STT/TTS adapters

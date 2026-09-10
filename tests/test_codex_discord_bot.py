@@ -149,3 +149,35 @@ def test_remote_chat_worker_posts_prompt_only(monkeypatch):
         "authorization": "Bearer chat-worker-test-token",
         "timeout": 7.5,
     }
+
+
+def test_remote_chat_worker_health_is_authenticated(monkeypatch):
+    captured = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return b'{"state":"ready","capabilities":["prompt-only","read-only"]}'
+
+    def fake_urlopen(request, timeout):
+        captured.update(
+            url=request.full_url,
+            authorization=request.get_header("Authorization"),
+            timeout=timeout,
+        )
+        return FakeResponse()
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    worker = RemoteCodexChatWorker("http://chat-worker.test", "private-token", timeout=4)
+
+    assert worker.status()["state"] == "ready"
+    assert captured == {
+        "url": "http://chat-worker.test/health",
+        "authorization": "Bearer private-token",
+        "timeout": 4,
+    }

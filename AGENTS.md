@@ -44,10 +44,15 @@ runtime/cache paths are intentionally ignored by Git.
 Use a `codex/...` branch or worktree for code changes. Do not edit an installed
 Hermes runtime or a production checkout as the implementation worktree.
 
-## Hermes/Codex technical-operation policy
+## Hermes/Codex ownership policy
 
-Hermes is the requester, executor, and voice reporter. It is not the final
-technical approver. A technical change follows this path:
+Hermes and Codex are separate operational domains. Hermes owns only Hermes
+runtime work and its own verification. Codex owns Codex runtime work and the
+control-plane integrations that coordinate systems, including shared routing,
+synchronisation, and knowledge-base pipelines. Do not make Hermes design or
+approve a Codex-owned integration.
+
+A Codex-owned technical change may use this lifecycle:
 
 ```text
 REQUESTED -> PLANNED -> IMPLEMENTING -> VERIFYING -> APPROVED -> DEPLOYED
@@ -55,11 +60,17 @@ REQUESTED -> PLANNED -> IMPLEMENTING -> VERIFYING -> APPROVED -> DEPLOYED
 
 Use `NEEDS_FIX`, `BLOCKED`, or `CANCELLED` when appropriate.
 
-### Audit levels
+### Verification and audit scope
 
-Read-only inspection, log viewing, process checks, and existing tests may be
-performed without an independent audit. The following always require the VPS
-Codex auditor before completion or deployment:
+Do not route every Hermes and Codex operation through a single VPS Codex
+auditor. That older cross-system audit gate was abandoned because its sandbox
+could not safely or accurately verify both domains. Verification stays with
+the owner of the affected domain.
+
+The Codex technical ledger and auditor remain available for explicitly
+Codex-owned work when an independent review is useful. They are not a universal
+completion gate for Hermes work. The following still require explicit user
+confirmation and owner-scoped verification:
 
 - code, configuration, dependency, audio-pipeline, or routing changes;
 - service restarts, deployment, authentication, permission, or network changes;
@@ -70,12 +81,10 @@ Every command result should record the command, expected result, actual result,
 exit code, changed files, tests, health checks, and next action. Do not store
 voice transcripts, raw audio, tokens, or secrets in the technical ledger.
 
-An audit result must be strict JSON with `PASS`, `PASS_WITH_WARNINGS`, `FAIL`, or
-`BLOCKED`, plus rationale, evidence, issues, improvement plan, production
-readiness, and rollback plan. Missing, truncated, or vague evidence is not a
-pass. Hermes/JUNMAI may say a technical change is complete only after
-`PASS`/`PASS_WITH_WARNINGS`; on `FAIL` or `BLOCKED`, relay the auditor's
-improvement plan and do not deploy.
+When a Codex-owned task requests an audit, its result must be strict JSON with
+`PASS`, `PASS_WITH_WARNINGS`, `FAIL`, or `BLOCKED`, plus rationale, evidence,
+issues, improvement plan, production readiness, and rollback plan. Missing,
+truncated, or vague evidence is not a pass for that scoped task.
 
 Prefer a ready local Codex worker for implementation. Use the VPS worker as the
 fallback when the local PC is unavailable. The VPS auditor remains independent.
@@ -208,8 +217,9 @@ Before reporting work as complete:
 1. inspect the diff and confirm no secrets or generated runtime files are present;
 2. run the relevant tests, normally `pytest -q`;
 3. perform targeted health checks without exposing credentials;
-4. submit the required VPS Codex audit with evidence and rollback information;
-5. report `PASS`/`PASS_WITH_WARNINGS`, warnings, remaining risks, and the next
+4. perform verification in the owning domain and use an independent auditor
+   only when the scoped task requires it;
+5. report the result, warnings, remaining risks, and the next
    action in a short voice-friendly summary.
 
 If any required evidence is missing, report the task as incomplete or blocked.

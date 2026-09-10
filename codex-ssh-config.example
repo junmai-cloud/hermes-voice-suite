@@ -1,0 +1,13 @@
+Host hub-vps
+    HostName 133.88.122.185
+    User deployuse
+    Port 22
+    IdentityFile C:/Users/aspop/.ssh/hermes_conoha
+    IdentitiesOnly yes
+    PreferredAuthentications publickey
+    PasswordAuthentication no
+    KbdInteractiveAuthentication no
+    ConnectionAttempts 1
+    ConnectTimeout 8
+    ServerAliveInterval 30
+    ServerAliveCountMax 3

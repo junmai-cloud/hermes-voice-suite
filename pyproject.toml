@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
 [project]
 name = "hermes-voice-suite"
 version = "0.1.0"
@@ -9,7 +13,13 @@ dependencies = []
 [project.optional-dependencies]
 voice = [
   "py-cord[voice]>=2.7,<3",
+  "audioop-lts>=0.2.2; python_version >= '3.13'",
   "openai>=1.0",
+]
+
+calendar = [
+  "google-api-python-client>=2.0,<3",
+  "google-auth-oauthlib>=1.0,<2",
 ]
 
 test = ["pytest>=8,<9"]
@@ -22,7 +32,11 @@ codex-voice-bot = "voice_suite.codex_runner:main"
 codex-local-bot = "voice_suite.codex_local_cli:main"
 codex-chat = "voice_suite.codex_chat_cli:main"
 podcast-render = "voice_suite.podcast_cli:main"
+calendar-auth = "voice_suite.google_calendar_cli:main"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/voice_suite"]

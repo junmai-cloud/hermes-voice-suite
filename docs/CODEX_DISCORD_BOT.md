@@ -80,6 +80,11 @@ user as well.
   and `/stats` use the shared voice bridge with OpenAI STT/TTS adapters.
 - The chat worker uses `read-only` Codex sandboxing and a read-only repository
   mount. Discord chat does not directly apply code changes.
+- `codex-voice-bot --check` performs an authenticated `/health` request and
+  requires both `prompt-only` and `read-only` capabilities. Configuration
+  presence alone is not a successful preflight.
+- Compose starts the Discord Bot only after the Chat Worker passes the same
+  authenticated health contract.
 
 ## Secrets
 

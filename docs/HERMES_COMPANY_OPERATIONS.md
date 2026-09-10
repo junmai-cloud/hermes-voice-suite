@@ -49,15 +49,24 @@ VPSは常時稼働し、ローカルはHeartbeatで参加・離脱する。ロ�
 
 ## 3. Workerルーティング
 
-技術実装は `voice_suite.technical_service.WorkerPool` と `TechnicalOrchestrator` が担当する。
+Codex領域の技術実装は `voice_suite.technical_service.WorkerPool` と
+`TechnicalOrchestrator` が担当する。Hermes内部の運用をこの経路へ強制的に
+通さない。システム間連携、同期、共通知識パイプラインなどの主導権は
+Codex側に置き、HermesはHermes側アダプターと実行結果だけを担当する。
+
+HermesはVPS上のCodex CLIへ要望を投入できるが、任意の生コマンドを組み立てて
+`codex exec --sandbox danger-full-access` を起動してはならない。投入は固定された
+Codex worker境界を使い、実装は`workspace-write`、読み取り確認は`read-only`に
+限定する。HermesがCodexを起動できることと、Hermesが権限や実装方針を決めて
+よいことは同義ではない。
 
 ```text
-案件受付
-  -> Hermesが処理種別を判定
+Codex案件受付
+  -> Codexが処理種別と所有境界を判定
   -> ローカルworkerのready枠を確認
   -> readyならローカルへ投入
   -> 全枠busy / unavailableならVPSへ退避
-  -> 実装完了後、独立したVPS auditorへ監査依頼
+  -> 必要な場合だけ、Codex領域内の独立レビューを依頼
 ```
 
 1つのタスクは、同時に複数workerへ投入しない。投入後は担当workerに固定し、結果回収・キャンセルも同じworkerへ送る。これにより、同じ作業ブランチをローカルとVPSが同時編集する事故を防ぐ。
@@ -82,9 +91,17 @@ CODEX_LOCAL_WORKER_SLOTS=2
 - Gateway / VPS再起動
 - Bot TokenやOAuthの変更
 
-## 4. 監査境界
+## 4. 検証境界
 
-Hermes社とCodex社には、それぞれ独立した監査役を置く。実装workerと監査workerを同一タスクで兼務させない。
+全処理の最終確認をVPS Codex auditorへ集約する旧方式は採用しない。
+read-only sandboxからHermes内部とCodex内部の双方を正確に確認できないためである。
+HermesはHermes領域、CodexはCodex領域をそれぞれ検証する。複数システムを
+またぐ連携の設計・実装・検証主導はCodexが持ち、Hermesに設計判断を委ねない。
+
+Codex auditorは、Codex所有タスクで独立レビューが必要な場合に限って使う。
+Hermesの完了条件を一律にCodex auditorの結果へ依存させない。
+
+独立レビューを行う場合、実装workerと監査workerを同一タスクで兼務させない。
 
 Codex auditorの必須条件:
 
@@ -105,6 +122,12 @@ Codex auditorの必須条件:
 - VPS共有フォルダ: 会社間で明示的に共有する仕様・成果物・引き継ぎのみ
 - 各社の内部領域: セッション、認証、内部ログ、監査途中データを保持
 - Discord: 純米さんとの会議・判断・報告。高リスク操作は会議中でも対象確認と監査を省略しない
+
+共有知識基盤はCodexが能動的に設計・改善する。Hermesは利用者の要望を受け、
+構造化した要求としてCodexへ渡す。Codexはスキーマ、同期、鮮度、重複排除、
+障害時バックアップ、検証を所有し、Hermesは合意済みの契約を通じて読み書きする。
+Google Calendarなど一つの外部認証が失効しても予定把握が全面停止しないよう、
+最小限のデータを共有知識基盤へ一方向同期する復旧経路を設計する。
 
 ## 6. ローカルworkerの起動条件
 

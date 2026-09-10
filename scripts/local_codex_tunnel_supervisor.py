@@ -14,6 +14,7 @@ LOCAL_HOST = os.environ.get("CODEX_LOCAL_WORKER_HOST", "127.0.0.1")
 LOCAL_PORT = int(os.environ.get("CODEX_LOCAL_WORKER_PORT", "8767"))
 REMOTE_PORT = int(os.environ.get("CODEX_REMOTE_WORKER_PORT", "8767"))
 RETRY_SECONDS = int(os.environ.get("CODEX_TUNNEL_RETRY_SECONDS", "60"))
+MAX_RETRY_SECONDS = int(os.environ.get("CODEX_TUNNEL_MAX_RETRY_SECONDS", "3600"))
 
 
 def worker_ready() -> bool:
@@ -24,7 +25,10 @@ def worker_ready() -> bool:
         return False
 
 
-def ssh_ready() -> bool:
+def ssh_config_ready() -> bool:
+    """Validate the SSH configuration without opening a network connection."""
+    if not Path(SSH_CONFIG).is_file():
+        return False
     result = subprocess.run(
         [
             "ssh",
@@ -32,10 +36,8 @@ def ssh_ready() -> bool:
             SSH_CONFIG,
             "-o",
             "BatchMode=yes",
-            "-o",
-            "ConnectTimeout=8",
+            "-G",
             SSH_TARGET,
-            "true",
         ],
         cwd=ROOT,
         stdout=subprocess.DEVNULL,
@@ -45,16 +47,22 @@ def ssh_ready() -> bool:
     return result.returncode == 0
 
 
+def retry_delay(failures: int) -> int:
+    """Back off failed authentication paths so fail2ban is not hammered."""
+    return min(RETRY_SECONDS * (2 ** max(failures - 1, 0)), MAX_RETRY_SECONDS)
+
+
 def main() -> int:
     print(f"tunnel supervisor active remote=127.0.0.1:{REMOTE_PORT}", flush=True)
+    failures = 0
     while True:
         if not worker_ready():
             print("waiting for local worker health", flush=True)
             time.sleep(RETRY_SECONDS)
             continue
-        if not ssh_ready():
-            print("waiting for authenticated VPS SSH path", flush=True)
-            time.sleep(RETRY_SECONDS)
+        if not ssh_config_ready():
+            print("waiting for valid SSH config; no connection attempted", flush=True)
+            time.sleep(MAX_RETRY_SECONDS)
             continue
         command = [
             "ssh",
@@ -62,6 +70,10 @@ def main() -> int:
             SSH_CONFIG,
             "-o",
             "BatchMode=yes",
+            "-o",
+            "IdentitiesOnly=yes",
+            "-o",
+            "ConnectTimeout=8",
             "-o",
             "ExitOnForwardFailure=yes",
             "-o",
@@ -74,9 +86,14 @@ def main() -> int:
             "-N",
         ]
         print("reverse tunnel starting", flush=True)
+        started = time.monotonic()
         result = subprocess.run(command, cwd=ROOT, check=False)
-        print(f"reverse tunnel exited code={result.returncode}; retrying", flush=True)
-        time.sleep(RETRY_SECONDS)
+        if time.monotonic() - started >= 300:
+            failures = 0
+        failures += 1
+        delay = retry_delay(failures)
+        print(f"reverse tunnel exited code={result.returncode}; retrying in {delay}s", flush=True)
+        time.sleep(delay)
 
 
 if __name__ == "__main__":

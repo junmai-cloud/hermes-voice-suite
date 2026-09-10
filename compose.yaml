@@ -130,6 +130,21 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import json, os, urllib.request;
+          r=urllib.request.Request('http://127.0.0.1:8777/health',headers={'Authorization':'Bearer '+os.environ['CODEX_CHAT_WORKER_TOKEN']});
+          d=json.load(urllib.request.urlopen(r,timeout=5));
+          assert d.get('state') == 'ready';
+          assert {'prompt-only','read-only'} <= set(d.get('capabilities',[]))
+      interval: 30s
+      timeout: 8s
+      retries: 3
+      start_period: 20s
     security_opt:
       - no-new-privileges:true
 
@@ -155,7 +170,7 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:?set OPENAI_API_KEY in .env}
     depends_on:
       codex-chat-worker:
-        condition: service_started
+        condition: service_healthy
     read_only: true
     tmpfs:
       - /tmp

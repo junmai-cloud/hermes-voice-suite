@@ -33,3 +33,22 @@ python .\scripts\local_team_status.py
 ```
 
 `token=set` is only a presence check; no secret value is printed.
+
+## ConoHa SSH setup and ban avoidance
+
+Copy `codex-ssh-config.example` to the ignored `codex-ssh-config` file and
+confirm that `C:\Users\aspop\.ssh\hermes_conoha` exists. Never copy or print
+the private key. Before starting the supervisor, perform one configuration-only
+check and then one authenticated check:
+
+```powershell
+Copy-Item .\codex-ssh-config.example .\codex-ssh-config
+ssh -F .\codex-ssh-config -G hub-vps | Out-Null
+ssh -F .\codex-ssh-config -o BatchMode=yes hub-vps 'whoami; hostname; pwd'
+```
+
+Do not repeatedly test while the source address is banned. The tunnel
+supervisor makes no network attempt when its config is absent or invalid, uses
+only the configured identity, and exponentially backs off failed connections
+from 60 seconds to one hour. It also opens the tunnel directly rather than
+performing a second authentication probe first.

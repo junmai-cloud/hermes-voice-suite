@@ -122,6 +122,22 @@ class RemoteCodexChatWorker:
             raise RuntimeError("chat worker returned an empty response")
         return reply.strip()
 
+    def status(self) -> dict[str, object]:
+        """Return authenticated worker health without exposing credentials."""
+        request = urllib.request.Request(
+            f"{self.base_url}/health",
+            method="GET",
+            headers={"Authorization": f"Bearer {self._token}"},
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+            raise OSError(f"chat worker health check failed: {exc}") from exc
+        if not isinstance(payload, dict):
+            raise RuntimeError("chat worker returned invalid health data")
+        return payload
+
 
 class CodexRemoteBrain:
     """Answer Discord turns through the dedicated Codex chat worker."""

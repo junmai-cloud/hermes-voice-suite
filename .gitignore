@@ -43,6 +43,9 @@ desktop.ini
 .vscode/
 .idea/
 
+# Local reference checkouts and temporary worktrees
+/work/
+
 voice-cache/
 audio-cache/
 secrets/
