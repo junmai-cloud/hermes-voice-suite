@@ -42,3 +42,14 @@ tool disappearance.
 Codex owns plugin selection, installation, authentication health, live checks,
 and cross-system knowledge integrations. Hermes may submit requirements and use
 an exposed contract, but it does not certify Codex plugin readiness.
+
+## Recorded verification
+
+As of 2026-09-10 12:19:30 +09:00:
+
+- Selector: `google-calendar@openai-curated`
+- Installed and enabled: yes, version `1e285826`
+- Authentication: confirmed by the connected read-only Calendar tool
+- Live API: passed; a calendar-list read completed without reading event contents
+- Remaining local-adapter setup: `client_secret.json` is still required only for
+  the repository's standalone OAuth CLI (`google_calendar_cli`)
